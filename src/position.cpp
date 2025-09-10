@@ -43,7 +43,7 @@ namespace Zobrist {
 
 Key psq[PIECE_NB][SQUARE_NB];
 Key side, noPawns;
-}
+} //保存所有哈希随机数，包括各格子-各棋子的 psq、行棋方 side、以及“无兵”位 noPawns。
 
 namespace {
 
@@ -53,7 +53,7 @@ static constexpr Piece Pieces[] = {W_ROOK, W_ADVISOR, W_CANNON, W_PAWN, W_KNIGHT
                                    B_ROOK, B_ADVISOR, B_CANNON, B_PAWN, B_KNIGHT, B_BISHOP, B_KING};
 }  // namespace
 
-// Returns an ASCII representation of the position
+// Returns an ASCII representation of the position 把棋盘打印成ASCII码
 std::ostream& operator<<(std::ostream& os, const Position& pos) {
 
     os << "\n +---+---+---+---+---+---+---+---+---+\n";
@@ -77,7 +77,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 }
 
 
-// Initializes at startup the various arrays used to compute hash keys
+// Initializes at startup the various arrays used to compute hash keys 在启动时初始化用于计算哈希键的各个数组
 void Position::init() {
 
     PRNG rng(1070372);
@@ -94,6 +94,9 @@ void Position::init() {
 // Initializes the position object with the given FEN string.
 // This function is not very robust - make sure that input FENs are correct,
 // this is assumed to be the responsibility of the GUI.
+// 用给定的FEN字符串初始化位置对象。
+// 这个函数不是很健壮——确保输入的FEN是正确的，
+// 假设这是GUI的责任。
 Position& Position::set(const string& fenStr, StateInfo* si) {
     /*
    A FEN string defines a particular position using only the ASCII character set.
@@ -119,6 +122,24 @@ Position& Position::set(const string& fenStr, StateInfo* si) {
       incremented after Black's move.
 */
 
+/* 
+    整个 FEN 只用 ASCII 字符，字段之间用空格分隔，一共 6 个字段。
+    第 1 个字段：棋子布局
+                先写 9 路 10 行中的第 9 行（黑方底线），依次到第 0 行（红方底线）。
+                每行从 A 文件到 I 文件（也就是“左”到“右”）描述格子内容。
+                棋子用字母表示：
+                    红（白）方大写 - “R A C P N B K”
+                    黑方小写 - “r a c p n b k”
+                (R=车、A=仕、C=炮、P=兵、N=马、B=相、K=将)
+                    连续空格用数字 1-9 表示有多少个空格。
+                    不同行之间用 “/” 分隔。
+    第 2 个字段：轮到谁走
+                “w” 表示轮到红（白）方走；“b” 表示黑方走。
+    第 3 个字段：50 步规则用的半回合计数（象棋用到是 Rule-60，但思路类似）。
+                自上一次“兵走或吃子”以来已经过了多少步，用来判断是否能提出和棋。
+    第 4 个字段：全回合计数
+                从 1 开始计，每下完黑方再 +1。 
+*/
     unsigned char      token;
     size_t             idx;
     Square             sq = SQ_A9;
@@ -178,6 +199,7 @@ Position& Position::set(const string& fenStr, StateInfo* si) {
 
 
 // Sets king attacks to detect if a move gives check
+// 设置国王攻击以检测是否移动给出将军
 void Position::set_check_info() const {
 
     update_blockers<WHITE>();
@@ -210,6 +232,8 @@ void Position::set_check_info() const {
 // Computes the hash keys of the position, and other
 // data that once computed is updated incrementally as moves are made.
 // The function is only used when a new position is set up
+// 计算位置的哈希键和其他数据，这些数据一旦计算出来，在移动时会增量更新。
+// 该函数仅在设置新位置时使用
 void Position::set_state() const {
 
     st->key               = 0;
@@ -251,6 +275,7 @@ void Position::set_state() const {
 
 
 // Returns a FEN representation of the position.
+// 返回位置的FEN表示
 string Position::fen() const {
 
     int                emptyCnt;
@@ -287,6 +312,8 @@ string Position::fen() const {
 // Calculates st->blockersForKing[c] and st->pinners[~c],
 // which store respectively the pieces preventing king of color c from being in check
 // and the slider pieces of color ~c pinning pieces of color c to the king.
+// 计算st->blockersForKing[c]和st->pinners[~c]，
+// 分别存储阻止颜色为c的国王被将军的棋子和颜色为~c的滑动棋子将颜色为c的棋子固定在国王位置的棋子。
 template<Color c>
 void Position::update_blockers() const {
 
@@ -318,6 +345,8 @@ void Position::update_blockers() const {
 
 // Computes a bitboard of all pieces which attack a given square.
 // Slider attacks use the occupied bitboard to indicate occupancy.
+// 计算给定方格的所有攻击棋子位棋盘。
+// 滑动攻击使用位棋盘表示占用。
 Bitboard Position::attackers_to(Square s, Bitboard occupied) const {
 
     return (attacks_bb<PAWN_TO>(s, WHITE) & pieces(WHITE, PAWN))
@@ -333,6 +362,8 @@ Bitboard Position::attackers_to(Square s, Bitboard occupied) const {
 // Computes a bitboard of all pieces of a given color
 // which gives check to a given square. Slider attacks use the occupied bitboard
 // to indicate occupancy.
+// 计算给定颜色的所有棋子位棋盘，这些棋子可以将军给定方格。
+// 滑动攻击使用位棋盘表示占用。
 Bitboard Position::checkers_to(Color c, Square s, Bitboard occupied) const {
 
     return ((attacks_bb<PAWN_TO>(s, c) & pieces(PAWN))
@@ -344,6 +375,7 @@ Bitboard Position::checkers_to(Color c, Square s, Bitboard occupied) const {
 
 
 // Tests whether a pseudo-legal move is legal
+// 测试伪合法移动是否合法
 bool Position::legal(Move m) const {
 
     assert(m.is_ok());
@@ -379,6 +411,8 @@ bool Position::legal(Move m) const {
 // Takes a random move and tests whether the move is
 // pseudo-legal. It is used to validate moves from TT that can be corrupted
 // due to SMP concurrent access or hash position key aliasing.
+// 随机移动并测试移动是否伪合法。
+// 它用于验证来自TT的移动，由于SMP并发访问或哈希位置键别名而可能被破坏。
 bool Position::pseudo_legal(const Move m) const {
 
     Color  us   = sideToMove;
@@ -406,6 +440,7 @@ bool Position::pseudo_legal(const Move m) const {
 
 
 // Tests whether a pseudo-legal move gives a check
+// 测试伪合法移动是否给出将军
 bool Position::gives_check(Move m) const {
 
     assert(m.is_ok());
@@ -441,6 +476,9 @@ bool Position::gives_check(Move m) const {
 // moves should be filtered out before this function is called.
 // If a pointer to the TT table is passed, the entry for the new position
 // will be prefetched
+// 执行移动，并保存所有必要信息到StateInfo对象中。
+// 假设移动是合法的。伪合法的移动应该在调用此函数之前过滤掉。
+// 如果传递了TT表的指针，新的位置的条目将被预取。
 DirtyPiece Position::do_move(Move                      m,
                              StateInfo&                newSt,
                              bool                      givesCheck,
@@ -595,6 +633,7 @@ DirtyPiece Position::do_move(Move                      m,
 
 // Unmakes a move. When it returns, the position should
 // be restored to exactly the same state as before the move was made.
+// 撤销移动。当返回时，位置应恢复到移动前的完全相同状态。
 void Position::undo_move(Move m) {
 
     assert(m.is_ok());
@@ -629,6 +668,7 @@ void Position::undo_move(Move m) {
 
 // Used to do a "null move": it flips
 // the side to move without executing any move on the board.
+// 执行“空移动”：它翻转行棋方，而不在棋盘上执行任何移动。
 void Position::do_null_move(StateInfo& newSt, const TranspositionTable& tt) {
 
     assert(!checkers());
@@ -656,6 +696,7 @@ void Position::do_null_move(StateInfo& newSt, const TranspositionTable& tt) {
 
 
 // Must be used to undo a "null move"
+// 必须用于撤销“空移动”
 void Position::undo_null_move() {
 
     assert(!checkers());
@@ -671,6 +712,7 @@ void Position::undo_null_move() {
 // Tests if the SEE (Static Exchange Evaluation)
 // value of move is greater or equal to the given threshold. We'll use an
 // algorithm similar to alpha-beta pruning with a null window.
+// 测试移动的SEE（静态交换评估）值是否大于或等于给定的阈值。我们将使用类似于alpha-beta剪枝的算法，窗口为空。
 bool Position::see_ge(Move m, int threshold) const {
 
     assert(m.is_ok());
@@ -790,6 +832,7 @@ bool Position::see_ge(Move m, int threshold) const {
 
 
 // Like do_move(), but a little lighter
+// 类似于 do_move()，但稍微轻量一些
 std::pair<Piece, int> Position::light_do_move(Move m) {
 
     Square from     = m.from_sq();
@@ -837,6 +880,7 @@ void Position::light_undo_move(Move m, Piece captured, int id) {
 
 
 // Tests whether a pseudo-legal move is chase legal
+// 测试伪合法移动是否是牵制合法的
 bool Position::chase_legal(Move m) const {
 
     assert(m.is_ok());
@@ -860,6 +904,7 @@ bool Position::chase_legal(Move m) const {
 
 
 // Calculates the chase information for a given color.
+// 计算给定颜色的牵制信息。
 uint16_t Position::chased(Color c) {
 
     uint16_t chase = 0;
@@ -938,6 +983,7 @@ uint16_t Position::chased(Color c) {
 
 
 // Detects chases from state st - d to state st
+// 从状态 st - d 检测牵制到状态 st
 Value Position::detect_chases(int d, int ply) {
 
     // Grant each piece on board a unique id for each side
@@ -979,6 +1025,7 @@ Value Position::detect_chases(int d, int ply) {
 
 // Tests whether the position may end the game by rule 60, insufficient material, draw repetition,
 // perpetual check repetition or perpetual chase repetition that allows a player to claim a game result.
+// 测试是否可以通过规则60、棋子不足、和棋重复、长将重复或长牵制重复使玩家获得游戏结果。
 bool Position::rule_judge(Value& result, int ply) {
 
     // Restore rule 60 by adding back the checks
@@ -1124,6 +1171,7 @@ bool Position::rule_judge(Value& result, int ply) {
 
 // Flips position with the white and black sides reversed. This
 // is only useful for debugging e.g. for finding evaluation symmetry bugs.
+// 翻转位置，使白方和黑方互换。这在调试时非常有用，例如用于查找评估对称性错误。
 void Position::flip() {
 
     string            f, token;
@@ -1159,6 +1207,7 @@ void Position::flip() {
 // Performs some consistency checks for the position object
 // and raise an assert if something wrong is detected.
 // This is meant to be helpful when debugging.
+// 对位置对象执行一些一致性检查，如果检测到任何问题，则引发断言。这在调试时非常有用。
 bool Position::pos_is_ok() const {
 
     constexpr bool Fast = true;  // Quick (default) or full check?

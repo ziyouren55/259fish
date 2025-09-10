@@ -58,29 +58,34 @@ namespace Search {
 // Stack struct keeps track of the information we need to remember from nodes
 // shallower and deeper in the tree during the search. Each search thread has
 // its own array of Stack objects, indexed by the current ply.
+
+// 用于存储搜索过程中需要记住的信息。每个搜索线程都有自己的Stack对象数组，索引为当前的ply。
 struct Stack {
-    Move*                       pv;
-    PieceToHistory*             continuationHistory;
-    CorrectionHistory<PieceTo>* continuationCorrectionHistory;
-    int                         ply;
-    Move                        currentMove;
-    Move                        excludedMove;
-    Value                       staticEval;
-    int                         statScore;
-    int                         moveCount;
-    bool                        inCheck;
-    bool                        ttPv;
-    bool                        ttHit;
-    int                         cutoffCnt;
-    int                         reduction;
-    bool                        isPvNode;
-    int                         quietMoveStreak;
+    Move*                       pv;//主变
+    PieceToHistory*             continuationHistory;//指向连续历史表的指针
+    CorrectionHistory<PieceTo>* continuationCorrectionHistory;//指向连续修正历史表的指针
+    int                         ply;//当前深度（一个回合=2个ply）
+    Move                        currentMove;//当前正在搜索的移动
+    Move                        excludedMove;//排除移动（在静态搜索中，如果一个移动被排除，则它被存储在这里）
+    Value                       staticEval;//静态评估（静态搜索中，评估当前局面的价值）
+    int                         statScore;//静态分数（静态搜索中，评估当前局面的分数）
+    int                         moveCount;//移动计数
+    bool                        inCheck;//是否被将军
+    bool                        ttPv;//是否是PV节点（TT（置换表）中是否存在PV节点）
+    bool                        ttHit;//置换表是否命中
+    int                         cutoffCnt;//截断计数
+    int                         reduction;//当前节点的搜索深度缩减量
+    bool                        isPvNode;//是否是PV节点（todo:开局库，残局库）
+    int                         quietMoveStreak;//连续“安静走法”（非吃子、非将军等激烈走法）的数量，常用于静态搜索或延伸判断。
 };
 
 
 // RootMove struct is used for moves at the root of the tree. For each root move
 // we store a score and a PV (really a refutation in the case of moves which
 // fail low). Score is normally set at -VALUE_INFINITE for all non-pv moves.
+// 根节点移动结构体，用于存储根节点树中的移动。每个根节点移动存储一个分数和一个PV（实际上是一个反驳，在移动失败时的情况）。
+// 分数通常被设置为-VALUE_INFINITE，所有非PV移动都是如此。
+// PV指主变 principal variation，即最佳走法。
 struct RootMove {
 
     explicit RootMove(Move m) :
@@ -92,16 +97,16 @@ struct RootMove {
         return m.score != score ? m.score < score : m.previousScore < previousScore;
     }
 
-    uint64_t          effort           = 0;
-    Value             score            = -VALUE_INFINITE;
-    Value             previousScore    = -VALUE_INFINITE;
-    Value             averageScore     = -VALUE_INFINITE;
-    Value             meanSquaredScore = -VALUE_INFINITE * VALUE_INFINITE;
-    Value             uciScore         = -VALUE_INFINITE;
-    bool              scoreLowerbound  = false;
-    bool              scoreUpperbound  = false;
-    int               selDepth         = 0;
-    std::vector<Move> pv;
+    uint64_t          effort           = 0;//搜索努力值
+    Value             score            = -VALUE_INFINITE;//搜索得分
+    Value             previousScore    = -VALUE_INFINITE;//前一次搜索得分
+    Value             averageScore     = -VALUE_INFINITE;//平均得分
+    Value             meanSquaredScore = -VALUE_INFINITE * VALUE_INFINITE;//均方差得分   
+    Value             uciScore         = -VALUE_INFINITE;//UCI得分
+    bool              scoreLowerbound  = false;//得分下界
+    bool              scoreUpperbound  = false;//得分上界
+    int               selDepth         = 0;//选择深度
+    std::vector<Move> pv;//主变
 };
 
 using RootMoves = std::vector<RootMove>;

@@ -38,12 +38,12 @@ namespace Stockfish::Eval::NNUE {
 using FeatureSet = Features::HalfKAv2_hm;
 
 // Number of input feature dimensions after conversion
-constexpr IndexType TransformedFeatureDimensionsBig = 2048;
-constexpr int       L2Big                           = 15;
-constexpr int       L3Big                           = 32;
+constexpr IndexType TransformedFeatureDimensionsBig = 2048;//输入特征转换后的维度
+constexpr int       L2Big                           = 15;//第一层全连接层的输出维度
+constexpr int       L3Big                           = 32;//第二层全连接层的输出维度
 
-constexpr IndexType PSQTBuckets = 16;
-constexpr IndexType LayerStacks = 16;
+constexpr IndexType PSQTBuckets = 16;//位置价值表的桶数
+constexpr IndexType LayerStacks = 16;//层数
 
 // If vector instructions are enabled, we update and refresh the
 // accumulator tile by tile such that each tile fits in the CPU's
@@ -53,16 +53,16 @@ static_assert(PSQTBuckets % 8 == 0,
 
 template<IndexType L1, int L2, int L3>
 struct NetworkArchitecture {
-    static constexpr IndexType TransformedFeatureDimensions = L1;
-    static constexpr int       FC_0_OUTPUTS                 = L2;
-    static constexpr int       FC_1_OUTPUTS                 = L3;
+    static constexpr IndexType TransformedFeatureDimensions = L1;//输入特征转换后的维度
+    static constexpr int       FC_0_OUTPUTS                 = L2;//第一层全连接层的输出维度
+    static constexpr int       FC_1_OUTPUTS                 = L3;//第二层全连接层的输出维度
 
-    Layers::AffineTransformSparseInput<TransformedFeatureDimensions, FC_0_OUTPUTS + 1> fc_0;
-    Layers::SqrClippedReLU<FC_0_OUTPUTS + 1>                                           ac_sqr_0;
-    Layers::ClippedReLU<FC_0_OUTPUTS + 1>                                              ac_0;
-    Layers::AffineTransform<FC_0_OUTPUTS * 2, FC_1_OUTPUTS>                            fc_1;
-    Layers::ClippedReLU<FC_1_OUTPUTS>                                                  ac_1;
-    Layers::AffineTransform<FC_1_OUTPUTS, 1>                                           fc_2;
+    Layers::AffineTransformSparseInput<TransformedFeatureDimensions, FC_0_OUTPUTS + 1> fc_0;//第一层全连接层
+    Layers::SqrClippedReLU<FC_0_OUTPUTS + 1>                                           ac_sqr_0;//第一层激活函数
+    Layers::ClippedReLU<FC_0_OUTPUTS + 1>                                              ac_0;//第二层激活函数
+    Layers::AffineTransform<FC_0_OUTPUTS * 2, FC_1_OUTPUTS>                            fc_1;//第三层全连接层
+    Layers::ClippedReLU<FC_1_OUTPUTS>                                                  ac_1;//第四层激活函数
+    Layers::AffineTransform<FC_1_OUTPUTS, 1>                                           fc_2;//第五层全连接层
 
     // Hash value embedded in the evaluation file
     static constexpr std::uint32_t get_hash_value() {

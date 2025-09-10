@@ -128,8 +128,8 @@ else
    SUPPORTED_ARCH=false
 endif
 
-optimize = yes
-debug = no
+optimize = no
+debug = yes
 sanitize = none
 bits = 64
 prefetch = no

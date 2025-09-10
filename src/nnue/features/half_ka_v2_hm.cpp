@@ -46,18 +46,22 @@ IndexType HalfKAv2_hm::make_layer_stack_bucket(const Position& pos) {
 }
 
 // Index of a feature for a given king position and another piece on some square
+// 给定一个王的位置和另一个棋子在某个方格上，返回一个特征的索引
+// 通过4个参数在indexmap数组上映射到对应的特征
 template<Color Perspective>
 inline IndexType HalfKAv2_hm::make_index(Square s, Piece pc, int bucket, bool mirror) {
     return IndexType(
       IndexMap[mirror][Perspective == BLACK][type_of(pc) == ADVISOR || type_of(pc) == BISHOP][s]
-      + PieceSquareIndex[Perspective][pc] + PS_NB * bucket);
+      + PieceSquareIndex[Perspective][pc] 
+      + PS_NB * bucket);
 }
 
-// Explicit template instantiations
+// Explicit template instantiations 显式模板实例化
 template IndexType HalfKAv2_hm::make_index<WHITE>(Square s, Piece pc, int bucket, bool mirror);
 template IndexType HalfKAv2_hm::make_index<BLACK>(Square s, Piece pc, int bucket, bool mirror);
 
-// Get a list of indices for recently changed features
+// Get a list of indices for recently changed features 获取最近改变的特征的索引列表
+// 将dirtypiece的from和to位置映射到对应的特征
 template<Color Perspective>
 void HalfKAv2_hm::append_changed_indices(
   int bucket, bool mirror, const DirtyPiece& dp, IndexList& removed, IndexList& added) {

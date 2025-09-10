@@ -35,7 +35,7 @@
 
 namespace Stockfish::Eval::NNUE {
 
-// Returns the inverse of a permutation
+// Returns the inverse of a permutation 返回一个排列的逆
 template<std::size_t Len>
 constexpr std::array<std::size_t, Len>
 invert_permutation(const std::array<std::size_t, Len>& order) {
@@ -43,10 +43,10 @@ invert_permutation(const std::array<std::size_t, Len>& order) {
     for (std::size_t i = 0; i < order.size(); i++)
         inverse[order[i]] = i;
     return inverse;
-}
+}//可能：用于特征转换器的优化
 
-// Divide a byte region of size TotalSize to chunks of size
-// BlockSize, and permute the blocks by a given order
+// Divide a byte region of size TotalSize to chunks of size BlockSize, and permute the blocks by a given order
+// 将一个大小为TotalSize的字节区域分成大小为BlockSize的块，并按照给定的顺序排列这些块
 template<std::size_t BlockSize, typename T, std::size_t N, std::size_t OrderSize>
 void permute(T (&data)[N], const std::array<std::size_t, OrderSize>& order) {
     constexpr std::size_t TotalSize = N * sizeof(T);
@@ -76,27 +76,26 @@ void permute(T (&data)[N], const std::array<std::size_t, OrderSize>& order) {
     }
 }
 
-// Input feature converter
-template<IndexType TransformedFeatureDimensions>
+// Input feature converter 输入特征转换器
+template<IndexType TransformedFeatureDimensions>//貌似只会生成实例 featureTransformer<2048>
 class FeatureTransformer {
 
-    // Number of output dimensions for one side
+    // Number of output dimensions for one side 输入特征维度的一半
     static constexpr IndexType HalfDimensions = TransformedFeatureDimensions;
 
    public:
-    // Output type
+    // Output type 输出类型
     using OutputType = TransformedFeatureType;
 
-    // Number of input/output dimensions
+    // Number of input/output dimensions 输入/输出维度
     static constexpr IndexType InputDimensions  = FeatureSet::Dimensions;
     static constexpr IndexType OutputDimensions = HalfDimensions;
 
-    // Size of forward propagation buffer
+    // Size of forward propagation buffer 前向传播缓冲区大小
     static constexpr std::size_t BufferSize = OutputDimensions * sizeof(OutputType);
 
-    // Store the order by which 128-bit blocks of a 1024-bit data must
-    // be permuted so that calling packus on adjacent vectors of 16-bit
-    // integers loaded from the data results in the pre-permutation order
+    // Store the order by which 128-bit blocks of a 1024-bit data must be permuted so that calling packus on adjacent vectors of 16-bit integers loaded from the data results in the pre-permutation order
+    // 存储128位块的顺序，使得调用packus对从数据中加载的相邻16位整数向量进行排列，结果为预排列顺序
     static constexpr auto PackusEpi16Order = []() -> std::array<std::size_t, 8> {
 #if defined(USE_AVX512)
         // _mm512_packus_epi16 after permutation:
@@ -117,21 +116,24 @@ class FeatureTransformer {
 
     static constexpr auto InversePackusEpi16Order = invert_permutation(PackusEpi16Order);
 
-    // Hash value embedded in the evaluation file
+    // Hash value embedded in the evaluation file 嵌入在评估文件中的哈希值
     static constexpr std::uint32_t get_hash_value() {
         return FeatureSet::HashValue ^ (OutputDimensions * 2);
     }
 
+    // 对权重进行排列
     void permute_weights() {
         permute<16>(biases, PackusEpi16Order);
         permute<16>(weights, PackusEpi16Order);
     }
 
+    // 对权重进行逆排列
     void unpermute_weights() {
         permute<16>(biases, InversePackusEpi16Order);
         permute<16>(weights, InversePackusEpi16Order);
     }
 
+    // 对权重进行缩放
     inline void scale_weights(bool read) {
         for (IndexType j = 0; j < InputDimensions; ++j)
         {
@@ -144,7 +146,7 @@ class FeatureTransformer {
             biases[i] = read ? biases[i] * 2 : biases[i] / 2;
     }
 
-    // Read network parameters
+    // Read network parameters 读取网络参数
     bool read_parameters(std::istream& stream) {
 
         read_leb_128<BiasType>(stream, biases, HalfDimensions);
@@ -156,7 +158,7 @@ class FeatureTransformer {
         return !stream.fail();
     }
 
-    // Write network parameters
+    // Write network parameters 写入网络参数
     bool write_parameters(std::ostream& stream) {
 
         unpermute_weights();
@@ -171,7 +173,7 @@ class FeatureTransformer {
         return !stream.fail();
     }
 
-    // Convert input features
+    // Convert input features 转换输入特征  这里的bucket是层堆叠桶的桶号
     std::int32_t transform(const Position&                           pos,
                            AccumulatorStack&                         accumulatorStack,
                            AccumulatorCaches::Cache<HalfDimensions>* cache,
@@ -180,20 +182,20 @@ class FeatureTransformer {
 
         using namespace SIMD;
 
-        accumulatorStack.evaluate(pos, *this, *cache);
-        const auto& accumulatorState = accumulatorStack.latest();
+        accumulatorStack.evaluate(pos, *this, *cache); //获取最新的累加器状态（这里的this是featureTransformer<2048>，蕴含了2048）
+        const auto& accumulatorState = accumulatorStack.latest(); //获取最新的累加器状态
 
-        const Color perspectives[2]  = {pos.side_to_move(), ~pos.side_to_move()};
-        const auto& psqtAccumulation = (accumulatorState.acc<HalfDimensions>()).psqtAccumulation;
+        const Color perspectives[2]  = {pos.side_to_move(), ~pos.side_to_move()}; //获取当前局面和对手局面
+        const auto& psqtAccumulation = (accumulatorState.acc<HalfDimensions>()).psqtAccumulation; //获取当前局面和对手局面的psqt累加值
         const auto  psqt =
           (psqtAccumulation[perspectives[0]][bucket] - psqtAccumulation[perspectives[1]][bucket])
-          / 2;
+          / 2; //计算当前局面和对手局面的psqt累加值的差值
 
-        const auto& accumulation = (accumulatorState.acc<HalfDimensions>()).accumulation;
+        const auto& accumulation = (accumulatorState.acc<HalfDimensions>()).accumulation; //获取当前局面和对手局面的累加值
 
         for (IndexType p = 0; p < 2; ++p)
         {
-            const IndexType offset = (HalfDimensions / 2) * p;
+            const IndexType offset = (HalfDimensions / 2) * p; //计算当前局面和对手局面的累加值的偏移量
 
 #if defined(VECTOR)
 
@@ -286,21 +288,21 @@ class FeatureTransformer {
 
 #else
 
-            for (IndexType j = 0; j < HalfDimensions / 2; ++j)
+            for (IndexType j = 0; j < HalfDimensions / 2; ++j) //遍历当前局面和对手局面的累加值
             {
-                BiasType sum0 = accumulation[static_cast<int>(perspectives[p])][j + 0];
+                BiasType sum0 = accumulation[static_cast<int>(perspectives[p])][j + 0]; //获取当前局面和对手局面的累加值
                 BiasType sum1 =
-                  accumulation[static_cast<int>(perspectives[p])][j + HalfDimensions / 2];
-                sum0               = std::clamp<BiasType>(sum0, 0, 127 * 2);
-                sum1               = std::clamp<BiasType>(sum1, 0, 127 * 2);
-                output[offset + j] = static_cast<OutputType>(unsigned(sum0 * sum1) / 512);
+                  accumulation[static_cast<int>(perspectives[p])][j + HalfDimensions / 2]; //获取当前局面和对手局面的累加值
+                sum0               = std::clamp<BiasType>(sum0, 0, 127 * 2); //将累加值限制在0到127*2之间
+                sum1               = std::clamp<BiasType>(sum1, 0, 127 * 2); //将累加值限制在0到127*2之间
+                output[offset + j] = static_cast<OutputType>(unsigned(sum0 * sum1) / 512); //将累加值限制在0到127*2之间
             }
 
 #endif
         }
 
         return psqt;
-    }  // end of function transform()
+    }  // end of function transform() 结束函数transform()
 
     alignas(CacheLineSize) BiasType biases[HalfDimensions];
     alignas(CacheLineSize) WeightType weights[HalfDimensions * InputDimensions];
