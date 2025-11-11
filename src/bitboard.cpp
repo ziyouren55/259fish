@@ -24,9 +24,9 @@
 
 #include <set>
 #include <utility>
-#ifndef USE_PEXT
-    #include "magics.h"
-#endif
+// #ifndef USE_PEXT
+//     #include "magics.h"
+// #endif
 
 namespace Stockfish {
 
@@ -36,27 +36,36 @@ uint8_t SquareDistance[SQUARE_NB][SQUARE_NB];
 Bitboard SquareBB[SQUARE_NB];
 Bitboard LineBB[SQUARE_NB][SQUARE_NB];
 Bitboard BetweenBB[SQUARE_NB][SQUARE_NB];
-Bitboard PseudoAttacks[PIECE_TYPE_NB + 2][SQUARE_NB];
+//modify:修改伪攻击表大小
+Bitboard PseudoAttacks[PIECE_TYPE_NB][SQUARE_NB];
 
-Magic RookMagics[SQUARE_NB];
-Magic CannonMagics[SQUARE_NB];
-Magic BishopMagics[SQUARE_NB];
-Magic KnightMagics[SQUARE_NB];
-Magic KnightToMagics[SQUARE_NB];
+//delete:删除magic，添加新结构
+Bitboard JungleAreaBB, RiverBB, LandBB;//斗兽棋棋盘、河位棋盘表示、陆地棋盘表示
+Bitboard TrapBB[COLOR_NB], DenBB[COLOR_NB];//陷阱位棋盘表示、兽穴位棋盘表示
+
+Bitboard ORTH1[SQUARE_NB], LAND_ORTH1[SQUARE_NB], RIVER_ORTH1[SQUARE_NB];//纯几何四邻接表、限定为陆地的四邻接表、限定为河道的四邻接表
+
+Square   JumpTarget[SQUARE_NB][4];//跳跃目标位棋盘表示
+Bitboard JumpPathMask[SQUARE_NB][4];//跳跃路径位棋盘表示
 
 namespace {
 
-Bitboard RookTable[0x108000];    // To store rook attacks
-Bitboard CannonTable[0x108000];  // To store cannon attacks
-Bitboard BishopTable[0x228];     // To store bishop attacks
-Bitboard KnightTable[0x380];     // To store knight attacks
-Bitboard KnightToTable[0x3E0];   // To store by knight attacks
+// Bitboard RookTable[0x108000];    // To store rook attacks
+// Bitboard CannonTable[0x108000];  // To store cannon attacks
+// Bitboard BishopTable[0x228];     // To store bishop attacks
+// Bitboard KnightTable[0x380];     // To store knight attacks
+// Bitboard KnightToTable[0x3E0];   // To store by knight attacks
 
-const std::set<Direction> KnightDirections{2 * SOUTH + WEST, 2 * SOUTH + EAST, SOUTH + 2 * WEST,
-                                           SOUTH + 2 * EAST, NORTH + 2 * WEST, NORTH + 2 * EAST,
-                                           2 * NORTH + WEST, 2 * NORTH + EAST};
-const std::set<Direction> BishopDirections{2 * NORTH_EAST, 2 * SOUTH_EAST, 2 * SOUTH_WEST,
-                                           2 * NORTH_WEST};
+// const std::set<Direction> KnightDirections{2 * SOUTH + WEST, 2 * SOUTH + EAST, SOUTH + 2 * WEST,
+//                                            SOUTH + 2 * EAST, NORTH + 2 * WEST, NORTH + 2 * EAST,
+//                                            2 * NORTH + WEST, 2 * NORTH + EAST};
+// const std::set<Direction> BishopDirections{2 * NORTH_EAST, 2 * SOUTH_EAST, 2 * SOUTH_WEST,
+//                                            2 * NORTH_WEST};
+
+const std::set<Direction> BasicDirections{NORTH, SOUTH, EAST, WEST};
+
+//modify: 狮、虎可以跳跃（类似国际象棋的马）
+const std::set<Direction> JumpDirections{3 * SOUTH, 3 * NORTH, 2 * WEST, 2 * EAST};
 
 
 template<PieceType pt>
@@ -76,83 +85,128 @@ Bitboard safe_destination(Square s, int step) {
 
 // Returns an ASCII representation of a bitboard suitable
 // to be printed to standard output. Useful for debugging.
+//modify:适应斗兽棋棋盘
 std::string Bitboards::pretty(Bitboard b) {
 
-    std::string s = "+---+---+---+---+---+---+---+---+---+\n";
+    std::string s = "+---+---+---+---+---+---+---+\n";
 
-    for (Rank r = RANK_9; r >= RANK_0; --r)
+    for (Rank r = RANK_8; r >= RANK_0; --r)
     {
-        for (File f = FILE_A; f <= FILE_I; ++f)
+        for (File f = FILE_A; f <= FILE_G; ++f)
             s += b & make_square(f, r) ? "| X " : "|   ";
 
-        s += "| " + std::to_string(r) + "\n+---+---+---+---+---+---+---+---+---+\n";
+        s += "| " + std::to_string(r) + "\n+---+---+---+---+---+---+---+\n";
     }
-    s += "  a   b   c   d   e   f   g   h   i\n";
+    s += "  a   b   c   d   e   f   g\n";
 
     return s;
 }
-
 
 // Initializes various bitboard tables. It is called at
 // startup and relies on global objects to be already zero-initialized.
 void Bitboards::init() {
 
-    for (unsigned i = 0; i < (1 << 16); ++i)
-        PopCnt16[i] = uint8_t(std::bitset<16>(i).count());
-
-    for (Square s = SQ_A0; s <= SQ_I9; ++s)
+    // --- 0) 基础位板 ---
+    for (Square s = SQ_A0; s <= SQ_G8; ++s)
         SquareBB[s] = (Bitboard(1ULL) << std::uint8_t(s));
 
-    for (Square s1 = SQ_A0; s1 <= SQ_I9; ++s1)
-        for (Square s2 = SQ_A0; s2 <= SQ_I9; ++s2)
+    for (Square s1 = SQ_A0; s1 <= SQ_G8; ++s1)
+        for (Square s2 = SQ_A0; s2 <= SQ_G8; ++s2)
             SquareDistance[s1][s2] = std::max(distance<File>(s1, s2), distance<Rank>(s1, s2));
 
-    init_magics<ROOK>(RookTable, RookMagics IF_NOT_PEXT(, RookMagicsInit));
-    init_magics<CANNON>(CannonTable, CannonMagics IF_NOT_PEXT(, RookMagicsInit));
-    init_magics<BISHOP>(BishopTable, BishopMagics IF_NOT_PEXT(, BishopMagicsInit));
-    init_magics<KNIGHT>(KnightTable, KnightMagics IF_NOT_PEXT(, KnightMagicsInit));
-    init_magics<KNIGHT_TO>(KnightToTable, KnightToMagics IF_NOT_PEXT(, KnightToMagicsInit));
+    // --- 1) 7×9 有效区 / 河 / 陆 ---
+    JungleAreaBB = 0;
+    for (Rank r = RANK_0; r <= RANK_8; ++r)
+        JungleAreaBB |= rank_bb(r);
 
-    for (Square s1 = SQ_A0; s1 <= SQ_I9; ++s1)
+    const Bitboard rowsRiver = rank_bb(RANK_3) | rank_bb(RANK_4) | rank_bb(RANK_5);
+    // 经典斗兽棋：左河 (b,c)×(r3..r5)，右河 (e,f)×(r3..r5)
+    RiverBB = ((file_bb(FILE_B) | file_bb(FILE_C)) & rowsRiver)
+            | ((file_bb(FILE_E) | file_bb(FILE_F)) & rowsRiver);
+
+    LandBB = JungleAreaBB & ~RiverBB;
+
+    // --- 2) 陷阱/兽穴（白方在底、黑方在顶）---
+    // dens: d1 / d9 ； traps: c1/e1/d2 和 c9/e9/d8
+    DenBB[WHITE]  = square_bb(make_square(FILE_D, RANK_0));
+    TrapBB[WHITE] = square_bb(make_square(FILE_C, RANK_0)) | square_bb(make_square(FILE_E, RANK_0))
+                  | square_bb(make_square(FILE_D, RANK_1));
+
+    DenBB[BLACK]  = square_bb(make_square(FILE_D, RANK_8));
+    TrapBB[BLACK] = square_bb(make_square(FILE_C, RANK_8)) | square_bb(make_square(FILE_E, RANK_8))
+                  | square_bb(make_square(FILE_D, RANK_7));
+
+    // --- 3) 四邻接表（纯几何，不看占用与规则）---
+    for (Square s = SQ_A0; s <= SQ_G8; ++s)
     {
-        PseudoAttacks[NO_PIECE_TYPE][s1] = pawn_attacks_bb<WHITE>(s1);
-        PseudoAttacks[PAWN][s1]          = pawn_attacks_bb<BLACK>(s1);
+        Bitboard adj = 0;
+        for (int step : {NORTH, SOUTH, EAST, WEST})
+            adj |= safe_destination(s, step);  // 越界返回 0
 
-        PseudoAttacks[KNIGHT_TO][s1] = pawn_attacks_to_bb<WHITE>(s1);
-        PseudoAttacks[PAWN_TO][s1]   = pawn_attacks_to_bb<BLACK>(s1);
-
-        PseudoAttacks[ROOK][s1]   = attacks_bb<ROOK>(s1, 0);
-        PseudoAttacks[BISHOP][s1] = attacks_bb<BISHOP>(s1, 0);
-        PseudoAttacks[KNIGHT][s1] = attacks_bb<KNIGHT>(s1, 0);
-
-        // Only generate pseudo attacks in the palace squares for king and advisor
-        if (Palace & s1)
-        {
-            for (int step : {NORTH, SOUTH, WEST, EAST})
-                PseudoAttacks[KING][s1] |= safe_destination(s1, step);
-            PseudoAttacks[KING][s1] &= Palace;
-
-            for (int step : {NORTH_WEST, NORTH_EAST, SOUTH_WEST, SOUTH_EAST})
-                PseudoAttacks[ADVISOR][s1] |= safe_destination(s1, step);
-            PseudoAttacks[ADVISOR][s1] &= Palace;
-        }
-
-        for (Square s2 = SQ_A0; s2 <= SQ_I9; ++s2)
-        {
-            if (PseudoAttacks[ROOK][s1] & s2)
-            {
-                LineBB[s1][s2] = (attacks_bb(ROOK, s1, 0) & attacks_bb(ROOK, s2, 0)) | s1 | s2;
-                BetweenBB[s1][s2] =
-                  (attacks_bb(ROOK, s1, square_bb(s2)) & attacks_bb(ROOK, s2, square_bb(s1)));
-            }
-
-            if (PseudoAttacks[KNIGHT][s1] & s2)
-                BetweenBB[s1][s2] |= lame_leaper_path<KNIGHT_TO>(Direction(s2 - s1), s1);
-
-            BetweenBB[s1][s2] |= s2;
-        }
+        adj &= JungleAreaBB;  // 裁到 7×9
+        ORTH1[s]       = adj;
+        LAND_ORTH1[s]  = adj & LandBB;
+        RIVER_ORTH1[s] = adj & RiverBB;
     }
+
+    // --- 4) 狮/虎“跳河”预计算（从 s 朝四向，若紧邻是河则跨到第一块陆地）---
+    auto inRiver = [&](Square x) { return bool(RiverBB & square_bb(x)); };
+    auto inLand  = [&](Square x) { return bool(LandBB & square_bb(x)); };
+
+    auto fill_jump = [&](Square s, int dIdx, Direction step) {
+        Square cur = Square(s + step);
+        if (!is_ok(cur) || !inRiver(cur))
+            return;  // 紧邻不是河 → 无跳
+
+        Bitboard path = 0;  // 仅收集“河中”经过格
+        while (is_ok(cur) && inRiver(cur))
+        {
+            path |= square_bb(cur);
+            cur = Square(cur + step);
+        }
+        if (!is_ok(cur) || !inLand(cur))
+            return;  // 必须落在第一块陆地
+
+        JumpTarget[s][dIdx]   = cur;
+        JumpPathMask[s][dIdx] = path;
+    };
+
+    for (Square s = SQ_A0; s <= SQ_G8; ++s)
+    {
+        JumpTarget[s][0] = JumpTarget[s][1] = JumpTarget[s][2] = JumpTarget[s][3] = SQ_NONE;
+        JumpPathMask[s][0] = JumpPathMask[s][1] = JumpPathMask[s][2] = JumpPathMask[s][3] = 0;
+
+        fill_jump(s, 0, NORTH);
+        fill_jump(s, 1, SOUTH);
+        fill_jump(s, 2, EAST);
+        fill_jump(s, 3, WEST);
+    }
+
+    // --- 5) 伪攻击表（纯几何模板；规则过滤放到走法层）---
+    // 鼠：可上下水 → ORTH1；其它动物：仅陆地一步 → LAND_ORTH1
+    for (Square s = SQ_A0; s <= SQ_G8; ++s)
+    {
+        PseudoAttacks[RAT][s]       = attacks_bb<RAT>(s,       Bitboard(0));
+        PseudoAttacks[CAT][s]       = attacks_bb<CAT>(s,       Bitboard(0));
+        PseudoAttacks[DOG][s]       = attacks_bb<DOG>(s,       Bitboard(0));
+        PseudoAttacks[WOLF][s]      = attacks_bb<WOLF>(s,      Bitboard(0));
+        PseudoAttacks[PANTHER][s]   = attacks_bb<PANTHER>(s,   Bitboard(0));
+        PseudoAttacks[TIGER][s]     = attacks_bb<TIGER>(s,     Bitboard(0));  // 包含跳河落点
+        PseudoAttacks[LION][s]      = attacks_bb<LION>(s,      Bitboard(0));  // 包含跳河落点
+        PseudoAttacks[ELEPHANT][s]  = attacks_bb<ELEPHANT>(s,  Bitboard(0));
+    }
+
+    // --- 6) LineBB/BetweenBB 的最简初始化（斗兽棋基本用不到直线/夹线）---
+    for (Square s1 = SQ_A0; s1 <= SQ_G8; ++s1)
+        for (Square s2 = SQ_A0; s2 <= SQ_G8; ++s2)
+        {
+            LineBB[s1][s2]    = 0;
+            BetweenBB[s1][s2] = square_bb(s2);  // 保持“半开区间含 s2”的语义
+        }
 }
+
+//delete:删除magic相关逻辑
+
 
 namespace {
 

@@ -157,8 +157,8 @@ class Position {
 
     // Position consistency check, for debugging
     bool pos_is_ok() const; //检查棋局是否合法
-    void flip(); //翻转棋盘
-
+    bool can_capture(Color us, PieceType atk, PieceType dfd, Square from, Square to) const;
+    void flip();  //翻转棋盘
     StateInfo* state() const; //返回当前状态
 
     void put_piece(Piece pc, Square s); //放置棋子
@@ -233,7 +233,10 @@ inline int Position::count() const {
     return count<Pt>(WHITE) + count<Pt>(BLACK);
 }
 
-inline Square Position::king_square(Color c) const { return kingSquare[c]; }
+//todo
+inline Square Position::king_square(Color c) const {
+    return c == WHITE ? lsb(DenBB[WHITE]) : lsb(DenBB[BLACK]);
+}
 
 inline uint64_t Position::mid_encoding(Color c) const { return midEncoding[c]; }
 
@@ -326,8 +329,9 @@ inline void Position::move_piece(Square from, Square to) {
     byColorBB[color_of(pc)] ^= fromTo;
     board[from] = NO_PIECE;
     board[to]   = pc;
-    if (type_of(pc) == KING)
-        kingSquare[color_of(pc)] = to;
+    //todo
+    // if (type_of(pc) == KING)
+    //     kingSquare[color_of(pc)] = to;
     midEncoding[color_of(pc)] -= Eval::NNUE::Features::HalfKAv2_hm::MidMirrorEncoding[pc][from];
     midEncoding[color_of(pc)] += Eval::NNUE::Features::HalfKAv2_hm::MidMirrorEncoding[pc][to];
 } //移动棋子

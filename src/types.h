@@ -121,7 +121,7 @@ constexpr bool Is64Bit = false;
     #endif
 
 using Key      = uint64_t;
-using Bitboard = __uint128_t;
+using Bitboard = uint64_t;
 
 constexpr int MAX_MOVES = 128;
 constexpr int MAX_PLY   = 246;
@@ -137,7 +137,7 @@ enum Bound : int8_t {
     BOUND_UPPER,
     BOUND_LOWER,
     BOUND_EXACT = BOUND_UPPER | BOUND_LOWER
-};
+};  // 是当前节点是否被截断的标志
 
 // Value is used as an alias for int, this is done to differentiate between a search
 // value and any other integer value. The values used in search are always supposed
@@ -167,31 +167,53 @@ constexpr bool is_loss(Value value) {
 
 constexpr bool is_decisive(Value value) { return is_win(value) || is_loss(value); }
 
-constexpr Value RookValue    = 1305;
-constexpr Value AdvisorValue = 219;
-constexpr Value CannonValue  = 773;
-constexpr Value PawnValue    = 144;
-constexpr Value KnightValue  = 720;
-constexpr Value BishopValue  = 187;
+// 斗兽棋棋子价值 (按捕食能力排序)todo:值是瞎写的
+constexpr Value ElephantValue = 1000;  // 象 - 最高价值
+constexpr Value LionValue     = 800;   // 狮 - 第二高
+constexpr Value TigerValue    = 600;   // 虎 - 第三高
+constexpr Value PantherValue  = 400;   // 豹 - 第四高
+constexpr Value WolfValue     = 300;   // 狼 - 第五高
+constexpr Value DogValue      = 200;   // 狗 - 第六高
+constexpr Value CatValue      = 100;   // 猫 - 第七高
+constexpr Value RatValue    = 50;    // 鼠 - 最低价值
 
 // clang-format off
+//todo :少了to结构
 enum PieceType : std::int8_t {
-    NO_PIECE_TYPE, ROOK, ADVISOR, CANNON, PAWN, KNIGHT, BISHOP, KING, KNIGHT_TO, PAWN_TO,
+    NO_PIECE_TYPE,
+    ELEPHANT, LION, TIGER, PANTHER, WOLF, DOG, CAT, RAT, 
     ALL_PIECES = 0,
-    PIECE_TYPE_NB = 8
+    PIECE_TYPE_NB = 9
 };
+
 
 enum Piece : std::int8_t {
     NO_PIECE,
-    W_ROOK           , W_ADVISOR, W_CANNON, W_PAWN, W_KNIGHT, W_BISHOP, W_KING,
-    B_ROOK = ROOK + 8, B_ADVISOR, B_CANNON, B_PAWN, B_KNIGHT, B_BISHOP, B_KING,
+    W_ELEPHANT               , W_LION, W_TIGER, W_PANTHER, W_WOLF, W_DOG, W_CAT, W_RAT,
+    B_ELEPHANT = ELEPHANT + 16, B_LION, B_TIGER, B_PANTHER, B_WOLF, B_DOG, B_CAT, B_RAT,
     PIECE_NB
 };
 
+//删减了一个0值，为了对齐好用位运算
 constexpr Value PieceValue[PIECE_NB] = {
-  VALUE_ZERO, RookValue,   AdvisorValue, CannonValue, PawnValue,  KnightValue, BishopValue,  VALUE_ZERO,
-  VALUE_ZERO, RookValue,   AdvisorValue, CannonValue, PawnValue,  KnightValue, BishopValue,  VALUE_ZERO};
+   VALUE_ZERO, 
+   ElephantValue, LionValue, TigerValue, PantherValue, WolfValue, DogValue, CatValue, RatValue,
+   VALUE_ZERO, VALUE_ZERO, VALUE_ZERO, VALUE_ZERO, VALUE_ZERO, VALUE_ZERO, VALUE_ZERO, VALUE_ZERO, 
+   ElephantValue, LionValue, TigerValue, PantherValue, WolfValue, DogValue, CatValue, RatValue};
 // clang-format on
+
+//add:添加棋子rank信息
+static constexpr int JungleRankPT[PIECE_TYPE_NB] = {
+    /* NO_PIECE_TYPE */ 0,
+    /* ELEPHANT      */ 8,
+    /* LION          */ 7,
+    /* TIGER         */ 6,
+    /* PANTHER       */ 5,
+    /* WOLF          */ 4,
+    /* DOG           */ 3,
+    /* CAT           */ 2,
+    /* RAT           */ 1
+};
 
 using Depth = int;
 
@@ -211,27 +233,27 @@ constexpr Depth DEPTH_QS = 0;
 constexpr Depth DEPTH_UNSEARCHED   = -2;
 constexpr Depth DEPTH_ENTRY_OFFSET = -3;
 
+// 斗兽棋棋盘: 7x9 = 63个格子
 // clang-format off
 enum Square : int8_t {
-    SQ_A0, SQ_B0, SQ_C0, SQ_D0, SQ_E0, SQ_F0, SQ_G0, SQ_H0, SQ_I0,
-    SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1, SQ_I1,
-    SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2, SQ_I2,
-    SQ_A3, SQ_B3, SQ_C3, SQ_D3, SQ_E3, SQ_F3, SQ_G3, SQ_H3, SQ_I3,
-    SQ_A4, SQ_B4, SQ_C4, SQ_D4, SQ_E4, SQ_F4, SQ_G4, SQ_H4, SQ_I4,
-    SQ_A5, SQ_B5, SQ_C5, SQ_D5, SQ_E5, SQ_F5, SQ_G5, SQ_H5, SQ_I5,
-    SQ_A6, SQ_B6, SQ_C6, SQ_D6, SQ_E6, SQ_F6, SQ_G6, SQ_H6, SQ_I6,
-    SQ_A7, SQ_B7, SQ_C7, SQ_D7, SQ_E7, SQ_F7, SQ_G7, SQ_H7, SQ_I7,
-    SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8, SQ_H8, SQ_I8,
-    SQ_A9, SQ_B9, SQ_C9, SQ_D9, SQ_E9, SQ_F9, SQ_G9, SQ_H9, SQ_I9,
+    SQ_A0, SQ_B0, SQ_C0, SQ_D0, SQ_E0, SQ_F0, SQ_G0,
+    SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1,
+    SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2,
+    SQ_A3, SQ_B3, SQ_C3, SQ_D3, SQ_E3, SQ_F3, SQ_G3,
+    SQ_A4, SQ_B4, SQ_C4, SQ_D4, SQ_E4, SQ_F4, SQ_G4,
+    SQ_A5, SQ_B5, SQ_C5, SQ_D5, SQ_E5, SQ_F5, SQ_G5,
+    SQ_A6, SQ_B6, SQ_C6, SQ_D6, SQ_E6, SQ_F6, SQ_G6,
+    SQ_A7, SQ_B7, SQ_C7, SQ_D7, SQ_E7, SQ_F7, SQ_G7,
+    SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8,
     SQ_NONE,
 
     SQUARE_ZERO = 0,
-    SQUARE_NB   = 90
+    SQUARE_NB   = 63
 };
 // clang-format on
 
 enum Direction : int8_t {
-    NORTH = 9,
+    NORTH = 7,  // 斗兽棋每行7个格子
     EAST  = 1,
     SOUTH = -NORTH,
     WEST  = -EAST,
@@ -250,9 +272,7 @@ enum File : int8_t {
     FILE_E,
     FILE_F,
     FILE_G,
-    FILE_H,
-    FILE_I,
-    FILE_NB
+    FILE_NB = 7
 };
 
 enum Rank : int8_t {
@@ -265,8 +285,8 @@ enum Rank : int8_t {
     RANK_6,
     RANK_7,
     RANK_8,
-    RANK_9,
-    RANK_NB
+
+    RANK_NB = 9
 };
 
 // For fast repetition checks
@@ -316,7 +336,7 @@ constexpr Square& operator-=(Square& s, Direction d) { return s = s - d; }
 constexpr Color operator~(Color c) { return Color(c ^ BLACK); }
 
 // Swap color of piece B_KNIGHT <-> W_KNIGHT
-constexpr Piece operator~(Piece pc) { return Piece(pc ^ 8); }
+constexpr Piece operator~(Piece pc) { return Piece(pc ^ 16); }
 
 constexpr Value mate_in(int ply) { return VALUE_MATE - ply; }
 
@@ -324,41 +344,45 @@ constexpr Value mated_in(int ply) { return -VALUE_MATE + ply; }
 
 constexpr Square make_square(File f, Rank r) { return Square(r * FILE_NB + f); }
 
-constexpr Piece make_piece(Color c, PieceType pt) { return Piece((c << 3) + pt); }
+constexpr Piece make_piece(Color c, PieceType pt) { return Piece((c << 4) + pt); }
 
-constexpr PieceType type_of(Piece pc) { return PieceType(pc & 7); }
-
+//modify:同上operator类似
+constexpr PieceType type_of(Piece pc) { return PieceType(pc & 15); }
+//modify:同上operator类似
 constexpr Color color_of(Piece pc) {
     assert(pc != NO_PIECE);
-    return Color(pc >> 3);
+    return Color((pc >> 4));
 }
 
-constexpr bool is_ok(Square s) { return s >= SQ_A0 && s <= SQ_I9; }
+constexpr bool is_ok(Square s) { return s >= SQ_A0 && s <= SQ_G8; }
 
 constexpr File file_of(Square s) { return File(s % FILE_NB); }
 
 constexpr Rank rank_of(Square s) { return Rank(s / FILE_NB); }
 
-// Swap A0 <-> A9
-constexpr Square flip_rank(Square s) { return make_square(file_of(s), Rank(RANK_9 - rank_of(s))); }
+// Swap A0 <-> A8
+constexpr Square flip_rank(Square s) { return make_square(file_of(s), Rank(RANK_8 - rank_of(s))); }
 
-// Swap A0 <-> I0
-constexpr Square flip_file(Square s) { return make_square(File(FILE_I - file_of(s)), rank_of(s)); }
+// Swap A0 <-> G0
+constexpr Square flip_file(Square s) { return make_square(File(FILE_G - file_of(s)), rank_of(s)); }
 
 // Based on a congruential pseudo-random number generator
+//todo:不知道什么东西
 constexpr Key make_key(uint64_t seed) {
     return seed * 6364136223846793005ULL + 1442695040888963407ULL;
 }
 
 // A move needs 16 bits to be stored
 //
-// bit  0- 6: destination square (from 0 to 89)
-// bit  7-13: origin square (from 0 to 89)
+// bit  0- 5: destination square (from 0 to 62) - 6 bits for 63 squares
+// bit  6-11: origin square (from 0 to 62) - 6 bits for 63 squares
+// bit 12-15: reserved for special move types
 //
 // Special cases are Move::none() and Move::null(). We can sneak these in because
 // in any normal move the destination square and origin square are always different,
 // but Move::none() and Move::null() have the same origin and destination square.
 
+//modify:由于棋盘大小从90转为63，故一个格子占位数从7变为6
 class Move {
    public:
     Move() = default;
@@ -366,21 +390,21 @@ class Move {
         data(d) {}
 
     constexpr Move(Square from, Square to) :
-        data((from << 7) + to) {}
+        data((from << 6) + to) {}
 
-    static constexpr Move make(Square from, Square to) { return Move((from << 7) + to); }
+    static constexpr Move make(Square from, Square to) { return Move((from << 6) + to); }
 
     constexpr Square from_sq() const {
         assert(is_ok());
-        return Square((data >> 7) & 0x7F);
+        return Square((data >> 6) & 0x3F);
     }
 
     constexpr Square to_sq() const {
         assert(is_ok());
-        return Square(data & 0x7F);
+        return Square(data & 0x3F);
     }
 
-    constexpr int from_to() const { return data & 0x3FFF; }
+    constexpr int from_to() const { return data & 0xFFF; }
 
     constexpr bool is_ok() const { return none().data != data && null().data != data; }
 

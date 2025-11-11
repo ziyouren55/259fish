@@ -38,24 +38,24 @@ ExtMove* generate_moves(const Position& pos, ExtMove* moveList, Bitboard target)
     {
         Square   from = pop_lsb(bb);
         Bitboard b    = 0;
-        if constexpr (Pt != CANNON)
-            b = (Pt != PAWN ? attacks_bb<Pt>(from, pos.pieces()) : attacks_bb<PAWN>(from, Us))
-              & target;
-        else
-        {
-            // Generate cannon capture moves.
-            if (Type != QUIETS)
-                b |= attacks_bb<CANNON>(from, pos.pieces()) & pos.pieces(~Us);
+        // if constexpr (Pt != CANNON)
+        //     b = (Pt != PAWN ? attacks_bb<Pt>(from, pos.pieces()) : attacks_bb<PAWN>(from, Us))
+        //       & target;
+        // else
+        // {
+        //     // Generate cannon capture moves.
+        //     if (Type != QUIETS)
+        //         b |= attacks_bb<CANNON>(from, pos.pieces()) & pos.pieces(~Us);
 
-            // Generate cannon quite moves.
-            if (Type != CAPTURES)
-                b |= attacks_bb<ROOK>(from, pos.pieces()) & ~pos.pieces();
+        //     // Generate cannon quite moves.
+        //     if (Type != CAPTURES)
+        //         b |= attacks_bb<ROOK>(from, pos.pieces()) & ~pos.pieces();
 
-            // Restrict to target if in evasion generation
-            if (Type == EVASIONS)
-                b &= target;
-        }
-
+        //     // Restrict to target if in evasion generation
+        //     if (Type == EVASIONS)
+        //         b &= target;
+        // }
+        b = attacks_bb<Pt>(from, pos.pieces()) & target;
         while (b)
             *moveList++ = Move(from, pop_lsb(b));
     }
@@ -65,12 +65,20 @@ ExtMove* generate_moves(const Position& pos, ExtMove* moveList, Bitboard target)
 
 template<Color Us, GenType Type>
 ExtMove* generate_moves(const Position& pos, ExtMove* moveList, Bitboard target) {
-    moveList = generate_moves<Us, PAWN, Type>(pos, moveList, target);
-    moveList = generate_moves<Us, BISHOP, Type>(pos, moveList, target);
-    moveList = generate_moves<Us, ADVISOR, Type>(pos, moveList, target);
-    moveList = generate_moves<Us, KNIGHT, Type>(pos, moveList, target);
-    moveList = generate_moves<Us, CANNON, Type>(pos, moveList, target);
-    moveList = generate_moves<Us, ROOK, Type>(pos, moveList, target);
+    // moveList = generate_moves<Us, PAWN, Type>(pos, moveList, target);
+    // moveList = generate_moves<Us, BISHOP, Type>(pos, moveList, target);
+    // moveList = generate_moves<Us, ADVISOR, Type>(pos, moveList, target);
+    // moveList = generate_moves<Us, KNIGHT, Type>(pos, moveList, target);
+    // moveList = generate_moves<Us, CANNON, Type>(pos, moveList, target);
+    // moveList = generate_moves<Us, ROOK, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, ELEPHANT, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, LION, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, TIGER, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, PANTHER, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, WOLF, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, DOG, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, CAT, Type>(pos, moveList, target);
+    moveList = generate_moves<Us, RAT, Type>(pos, moveList, target);
     return moveList;
 }
 
@@ -84,13 +92,14 @@ ExtMove* generate_all(const Position& pos, ExtMove* moveList) {
 
     moveList = generate_moves<Us, Type>(pos, moveList, target);
 
-    if (Type != EVASIONS)
-    {
-        Bitboard b = attacks_bb<KING>(ksq) & target;
+    //todo
+    // if (Type != EVASIONS)
+    // {
+    //     Bitboard b = attacks_bb<KING>(ksq) & target;
 
-        while (b)
-            *moveList++ = Move(ksq, pop_lsb(b));
-    }
+    //     while (b)
+    //         *moveList++ = Move(ksq, pop_lsb(b));
+    // }
 
     return moveList;
 }
@@ -140,37 +149,38 @@ ExtMove* generate<EVASIONS>(const Position& pos, ExtMove* moveList) {
     moveList        = us == WHITE ? generate_moves<WHITE, EVASIONS>(pos, moveList, target)
                                   : generate_moves<BLACK, EVASIONS>(pos, moveList, target);
 
-    // Generate evasions for king, capture and non capture moves
-    Bitboard b = attacks_bb<KING>(ksq) & ~pos.pieces(us);
-    // For all the squares attacked by slider checkers. We will remove them from
-    // the king evasions in order to skip known illegal moves, which avoids any
-    // useless legality checks later on.
-    if (pt == ROOK || pt == CANNON)
-        b &= ~line_bb(checksq, ksq) | pos.pieces(~us);
-    while (b)
-        *moveList++ = Move(ksq, pop_lsb(b));
+    //todo
+    // // Generate evasions for king, capture and non capture moves
+    // Bitboard b = attacks_bb<KING>(ksq) & ~pos.pieces(us);
+    // // For all the squares attacked by slider checkers. We will remove them from
+    // // the king evasions in order to skip known illegal moves, which avoids any
+    // // useless legality checks later on.
+    // if (pt == ROOK || pt == CANNON)
+    //     b &= ~line_bb(checksq, ksq) | pos.pieces(~us);
+    // while (b)
+    //     *moveList++ = Move(ksq, pop_lsb(b));
 
-    // Generate move away hurdle piece evasions for cannon
-    if (pt == CANNON)
-    {
-        Bitboard hurdle = between_bb(ksq, checksq) & pos.pieces(us);
-        if (hurdle)
-        {
-            Square hurdleSq = pop_lsb(hurdle);
-            pt              = type_of(pos.piece_on(hurdleSq));
-            if (pt == PAWN)
-                b = attacks_bb<PAWN>(hurdleSq, us) & ~line_bb(checksq, hurdleSq) & ~pos.pieces(us);
-            else if (pt == CANNON)
-                b = (attacks_bb<ROOK>(hurdleSq, pos.pieces()) & ~line_bb(checksq, hurdleSq)
-                     & ~pos.pieces())
-                  | (attacks_bb<CANNON>(hurdleSq, pos.pieces()) & pos.pieces(~us));
-            else
-                b = attacks_bb(pt, hurdleSq, pos.pieces()) & ~line_bb(checksq, hurdleSq)
-                  & ~pos.pieces(us);
-            while (b)
-                *moveList++ = Move(hurdleSq, pop_lsb(b));
-        }
-    }
+    // // Generate move away hurdle piece evasions for cannon
+    // if (pt == CANNON)
+    // {
+    //     Bitboard hurdle = between_bb(ksq, checksq) & pos.pieces(us);
+    //     if (hurdle)
+    //     {
+    //         Square hurdleSq = pop_lsb(hurdle);
+    //         pt              = type_of(pos.piece_on(hurdleSq));
+    //         if (pt == PAWN)
+    //             b = attacks_bb<PAWN>(hurdleSq, us) & ~line_bb(checksq, hurdleSq) & ~pos.pieces(us);
+    //         else if (pt == CANNON)
+    //             b = (attacks_bb<ROOK>(hurdleSq, pos.pieces()) & ~line_bb(checksq, hurdleSq)
+    //                  & ~pos.pieces())
+    //               | (attacks_bb<CANNON>(hurdleSq, pos.pieces()) & pos.pieces(~us));
+    //         else
+    //             b = attacks_bb(pt, hurdleSq, pos.pieces()) & ~line_bb(checksq, hurdleSq)
+    //               & ~pos.pieces(us);
+    //         while (b)
+    //             *moveList++ = Move(hurdleSq, pop_lsb(b));
+    //     }
+    // }
 
     return moveList;
 }
