@@ -28,7 +28,9 @@
 #include <utility>
 #include <vector>
 
+#if ENABLE_NNUE
 #include "nnue/network.h"
+#endif
 #include "numa.h"
 #include "position.h"
 #include "search.h"
@@ -116,7 +118,9 @@ class Engine {
     OptionsMap                               options;
     ThreadPool                               threads;
     TranspositionTable                       tt;
+#if ENABLE_NNUE
     LazyNumaReplicated<Eval::NNUE::Networks> networks;
+#endif
 
     Search::SearchManager::UpdateContext  updateContext;
     std::function<void(std::string_view)> onVerifyNetworks;

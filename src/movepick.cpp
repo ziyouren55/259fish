@@ -126,15 +126,16 @@ void MovePicker::score() {
 
     Color us = pos.side_to_move();
 
-    [[maybe_unused]] Bitboard threatByLesser[BISHOP + 1];
-    if constexpr (Type == QUIETS)
-    {
-        threatByLesser[ADVISOR] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
-        threatByLesser[KNIGHT]                           = threatByLesser[CANNON] =
-          pos.attacks_by<ADVISOR>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[ADVISOR];
-        threatByLesser[ROOK] =
-          pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<CANNON>(~us) | threatByLesser[KNIGHT];
-    }
+    //todo
+    // [[maybe_unused]] Bitboard threatByLesser[BISHOP + 1];
+    // if constexpr (Type == QUIETS)
+    // {
+    //     threatByLesser[ADVISOR] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
+    //     threatByLesser[KNIGHT]                           = threatByLesser[CANNON] =
+    //       pos.attacks_by<ADVISOR>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[ADVISOR];
+    //     threatByLesser[ROOK] =
+    //       pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<CANNON>(~us) | threatByLesser[KNIGHT];
+    // }
 
     for (auto& m : *this)
     {
@@ -144,14 +145,19 @@ void MovePicker::score() {
         const PieceType pt            = type_of(pc);
         const Piece     capturedPiece = pos.piece_on(to);
 
+        //todo
+        // if constexpr (Type == CAPTURES)
+        //     m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
+        //             + 7 * int(PieceValue[capturedPiece])
+        //             + 1024
+        //                 * bool((pt == CANNON
+        //                           ? pos.check_squares(pt) & ~line_bb(from, pos.king_square(~us))
+        //                           : pos.check_squares(pt))
+        //                        & to);
         if constexpr (Type == CAPTURES)
-            m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
-                    + 7 * int(PieceValue[capturedPiece])
-                    + 1024
-                        * bool((pt == CANNON
-                                  ? pos.check_squares(pt) & ~line_bb(from, pos.king_square(~us))
-                                  : pos.check_squares(pt))
-                               & to);
+        m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
+                + 7 * int(PieceValue[capturedPiece])
+                + 1024 * bool(pos.check_squares(pt) & to);
 
         else if constexpr (Type == QUIETS)
         {
@@ -165,21 +171,24 @@ void MovePicker::score() {
             m.value += (*continuationHistory[5])[pc][to];
 
             // bonus for checks
-            m.value +=
-              (bool((pt == CANNON ? pos.check_squares(pt) & ~line_bb(from, pos.king_square(~us))
-                                  : pos.check_squares(pt))
-                    & to)
-               && pos.see_ge(m, -75))
-              * 16384;
+            //todo
+            // m.value +=
+            //   (bool((pt == CANNON ? pos.check_squares(pt) & ~line_bb(from, pos.king_square(~us))
+            //                       : pos.check_squares(pt))
+            //         & to)
+            //    && pos.see_ge(m, -75))
+            //   * 16384;
+            m.value += (bool(pos.check_squares(pt) & to) && pos.see_ge(m, -75)) * 16384;
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            if (pt != PAWN && pt <= BISHOP)
-            {
-                static constexpr int bonus[BISHOP + 1] = {0, 517, 144, 256, 0, 256, 144};
-                int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
-                m.value += bonus[pt] * v;
-            }
+            //todo
+            // if (pt != PAWN && pt <= BISHOP)
+            // {
+            //     static constexpr int bonus[BISHOP + 1] = {0, 517, 144, 256, 0, 256, 144};
+            //     int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
+            //     m.value += bonus[pt] * v;
+            // }
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + ply);

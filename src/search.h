@@ -32,8 +32,10 @@
 
 #include "history.h"
 #include "misc.h"
+#if ENABLE_NNUE
 #include "nnue/network.h"
 #include "nnue/nnue_accumulator.h"
+#endif
 #include "numa.h"
 #include "position.h"
 #include "score.h"
@@ -136,21 +138,28 @@ struct LimitsType {
 // The UCI stores the uci options, thread pool, and transposition table.
 // This struct is used to easily forward data to the Search::Worker class.
 struct SharedState {
-    SharedState(const OptionsMap&                               optionsMap,
-                ThreadPool&                                     threadPool,
-                TranspositionTable&                             transpositionTable,
-                const LazyNumaReplicated<Eval::NNUE::Networks>& nets) :
+    SharedState(const OptionsMap&   optionsMap,
+                ThreadPool&         threadPool,
+                TranspositionTable& transpositionTable
+#if ENABLE_NNUE
+              , const LazyNumaReplicated<Eval::NNUE::Networks>& nets
+#endif
+    ) :
         options(optionsMap),
         threads(threadPool),
-        tt(transpositionTable),
-        networks(nets) {}
+        tt(transpositionTable)
+#if ENABLE_NNUE
+      , networks(nets)
+#endif
+    {}
 
-    const OptionsMap&                               options;
-    ThreadPool&                                     threads;
-    TranspositionTable&                             tt;
+    const OptionsMap& options;
+    ThreadPool&       threads;
+    TranspositionTable& tt;
+#if ENABLE_NNUE
     const LazyNumaReplicated<Eval::NNUE::Networks>& networks;
+#endif
 };
-
 class Worker;
 
 // Null Object Pattern, implement a common interface for the SearchManagers.
@@ -324,11 +333,12 @@ class Worker {
     const OptionsMap&                               options;
     ThreadPool&                                     threads;
     TranspositionTable&                             tt;
+#if ENABLE_NNUE
     const LazyNumaReplicated<Eval::NNUE::Networks>& networks;
-
     // Used by NNUE
     Eval::NNUE::AccumulatorStack  accumulatorStack;
     Eval::NNUE::AccumulatorCaches refreshTable;
+#endif
 
     friend class Stockfish::ThreadPool;
     friend class SearchManager;

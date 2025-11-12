@@ -46,6 +46,12 @@
     #include <arm_neon.h>
 #endif
 
+#ifndef NNUE_COMPAT
+// 1: NNUE 兼容模式（不读网，零评估；绕开与棋盘规模耦合的表/循环）
+// 0: 关闭兼容（走原始 NNUE 逻辑）
+#define NNUE_COMPAT 1
+#endif
+
 namespace Stockfish::Eval::NNUE {
 
 using BiasType       = std::int16_t;

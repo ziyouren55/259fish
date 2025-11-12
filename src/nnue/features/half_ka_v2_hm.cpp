@@ -34,27 +34,54 @@ bool HalfKAv2_hm::requires_mid_mirror(const Position& pos, Color c) {
 
 // Get attack bucket
 IndexType HalfKAv2_hm::make_attack_bucket(const Position& pos, Color c) {
-    return AttackBucket[pos.count<ROOK>(c)][pos.count<KNIGHT>(c)][pos.count<CANNON>(c)];
-}
-
-// Get layer stack bucket
-IndexType HalfKAv2_hm::make_layer_stack_bucket(const Position& pos) {
-    Color us = pos.side_to_move();
-    return LayerStackBuckets[pos.count<ROOK>(us)][pos.count<ROOK>(~us)]
-                            [pos.count<KNIGHT>(us) + pos.count<CANNON>(us)]
-                            [pos.count<KNIGHT>(~us) + pos.count<CANNON>(~us)];
-}
-
-// Index of a feature for a given king position and another piece on some square
-// 给定一个王的位置和另一个棋子在某个方格上，返回一个特征的索引
-// 通过4个参数在indexmap数组上映射到对应的特征
-template<Color Perspective>
-inline IndexType HalfKAv2_hm::make_index(Square s, Piece pc, int bucket, bool mirror) {
-    return IndexType(
-      IndexMap[mirror][Perspective == BLACK][type_of(pc) == ADVISOR || type_of(pc) == BISHOP][s]
-      + PieceSquareIndex[Perspective][pc] 
-      + PS_NB * bucket);
-}
+  #if NNUE_COMPAT
+      // 斗兽棋模式：使用不同的棋子类型
+      // 选择有代表性的强力棋子：LION(狮), TIGER(虎), ELEPHANT(象)
+      return AttackBucket[pos.count<LION>(c)][pos.count<TIGER>(c)][pos.count<ELEPHANT>(c)];
+  #else
+      // 象棋模式：原有实现
+      return AttackBucket[pos.count<ROOK>(c)][pos.count<KNIGHT>(c)][pos.count<CANNON>(c)];
+  #endif
+  }
+  
+  // Get layer stack bucket
+  IndexType HalfKAv2_hm::make_layer_stack_bucket(const Position& pos) {
+  #if NNUE_COMPAT
+      // 斗兽棋模式：使用不同的棋子类型组合
+      Color us = pos.side_to_move();
+      // 使用狮子和大象作为主要强力棋子，虎+象作为组合
+      return LayerStackBuckets[pos.count<LION>(us)][pos.count<LION>(~us)]
+                              [pos.count<TIGER>(us) + pos.count<ELEPHANT>(us)]
+                              [pos.count<TIGER>(~us) + pos.count<ELEPHANT>(~us)];
+  #else
+      // 象棋模式：原有实现
+      Color us = pos.side_to_move();
+      return LayerStackBuckets[pos.count<ROOK>(us)][pos.count<ROOK>(~us)]
+                              [pos.count<KNIGHT>(us) + pos.count<CANNON>(us)]
+                              [pos.count<KNIGHT>(~us) + pos.count<CANNON>(~us)];
+  #endif
+  }
+  
+  // Index of a feature for a given king position and another piece on some square
+  // 给定一个王的位置和另一个棋子在某个方格上，返回一个特征的索引
+  // 通过4个参数在indexmap数组上映射到对应的特征
+  template<Color Perspective>
+  inline IndexType HalfKAv2_hm::make_index(Square s, Piece pc, int bucket, bool mirror) {
+  #if NNUE_COMPAT
+      // 斗兽棋模式：没有 ADVISOR 和 BISHOP，直接使用简化的索引
+      // 所有棋子都使用相同的映射方式
+      return IndexType(
+        IndexMap[mirror][Perspective == BLACK][0][s]  // 第三维度固定为0
+        + PieceSquareIndex[Perspective][pc] 
+        + PS_NB * bucket);
+  #else
+      // 象棋模式：原有实现（区分仕相）
+      return IndexType(
+        IndexMap[mirror][Perspective == BLACK][type_of(pc) == ADVISOR || type_of(pc) == BISHOP][s]
+        + PieceSquareIndex[Perspective][pc] 
+        + PS_NB * bucket);
+  #endif
+  }
 
 // Explicit template instantiations 显式模板实例化
 template IndexType HalfKAv2_hm::make_index<WHITE>(Square s, Piece pc, int bucket, bool mirror);

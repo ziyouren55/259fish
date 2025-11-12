@@ -145,9 +145,11 @@ Position& Position::set(const string& fenStr, StateInfo* si) {
 
     std::memset(this, 0, sizeof(Position));
 
+    #if ENABLE_NNUE
     midEncoding[WHITE] = midEncoding[BLACK] = Eval::NNUE::Features::HalfKAv2_hm::BalanceEncoding;
-
-    std::memset(si, 0, sizeof(StateInfo));
+    #else
+    midEncoding[WHITE] = midEncoding[BLACK] = 0;
+    #endif
     st = si;
 
     ss >> std::noskipws;
@@ -604,10 +606,12 @@ DirtyPiece Position::do_move(Move                      m,
     //     dp.requires_refresh[them] = (mirror_before != mirror_after);
     // }
     // else
-        dp.requires_refresh[us] = dp.requires_refresh[them] = false;
+    dp.requires_refresh[us] = dp.requires_refresh[them] = false;
 
+    #if ENABLE_NNUE
     bool mid_mirror_before[2] = {Eval::NNUE::FeatureSet::requires_mid_mirror(*this, us),
                                  Eval::NNUE::FeatureSet::requires_mid_mirror(*this, them)};
+    #endif
 
     if (captured)
     {
@@ -641,15 +645,19 @@ DirtyPiece Position::do_move(Move                      m,
         dp.remove_pc = captured;
         dp.remove_sq = capsq;
 
+    #if ENABLE_NNUE
         auto attack_bucket_before = Eval::NNUE::FeatureSet::make_attack_bucket(*this, them);
-
+    #endif
+        
         // Update board and piece lists
         remove_piece(capsq);
-
+        
+    #if ENABLE_NNUE
         auto attack_bucket_after = Eval::NNUE::FeatureSet::make_attack_bucket(*this, them);
-
+        
         if (attack_bucket_before != attack_bucket_after)
             dp.requires_refresh[them] = true;
+    #endif
 
         // Update hash key
         k ^= Zobrist::psq[captured][capsq];
@@ -683,10 +691,12 @@ DirtyPiece Position::do_move(Move                      m,
     // Move the piece.
     move_piece(from, to);
 
+    #if ENABLE_NNUE
     dp.requires_refresh[us] |=
       (mid_mirror_before[0] != Eval::NNUE::FeatureSet::requires_mid_mirror(*this, us));
     dp.requires_refresh[them] |=
       (mid_mirror_before[1] != Eval::NNUE::FeatureSet::requires_mid_mirror(*this, them));
+    #endif
 
     // Update the key with the final value
     st->key = k;

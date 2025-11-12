@@ -30,7 +30,7 @@ namespace {
 template<Color Us, PieceType Pt, GenType Type>
 ExtMove* generate_moves(const Position& pos, ExtMove* moveList, Bitboard target) {
 
-    static_assert(Pt != KING, "Unsupported piece type in generate_moves()");
+//    static_assert(Pt != KING, "Unsupported piece type in generate_moves()");
 
     Bitboard bb = pos.pieces(Us, Pt);
 

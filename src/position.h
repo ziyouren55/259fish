@@ -19,6 +19,8 @@
 #ifndef POSITION_H_INCLUDED
 #define POSITION_H_INCLUDED
 
+
+
 #include <stdint.h>
 #include <cassert>
 #include <cstring>
@@ -29,7 +31,9 @@
 #include <utility>
 
 #include "bitboard.h"
+#if ENABLE_NNUE
 #include "nnue/features/half_ka_v2_hm.h"
+#endif
 #include "types.h"
 
 namespace Stockfish {
@@ -252,9 +256,10 @@ inline Bitboard Position::attacks_by(Color c) const {
     Bitboard threats   = 0;
     Bitboard attackers = pieces(c, Pt);
     while (attackers)
-        if (Pt == PAWN)
-            threats |= attacks_bb<PAWN>(pop_lsb(attackers), c);
-        else
+    //todo
+        // if (Pt == PAWN)
+        //     threats |= attacks_bb<PAWN>(pop_lsb(attackers), c);
+        // else
             threats |= attacks_bb<Pt>(pop_lsb(attackers), pieces());
     return threats;
 }
@@ -305,7 +310,10 @@ inline void Position::put_piece(Piece pc, Square s) {
     byColorBB[color_of(pc)] |= s;
     pieceCount[pc]++;
     pieceCount[make_piece(color_of(pc), ALL_PIECES)]++;
+    //todo
+#if ENABLE_NNUE
     midEncoding[color_of(pc)] += Eval::NNUE::Features::HalfKAv2_hm::MidMirrorEncoding[pc][s];
+#endif
 } //放置棋子
 
 inline void Position::remove_piece(Square s) {
@@ -317,7 +325,10 @@ inline void Position::remove_piece(Square s) {
     board[s] = NO_PIECE;
     pieceCount[pc]--;
     pieceCount[make_piece(color_of(pc), ALL_PIECES)]--;
+    //todo
+#if ENABLE_NNUE
     midEncoding[color_of(pc)] -= Eval::NNUE::Features::HalfKAv2_hm::MidMirrorEncoding[pc][s];
+#endif
 } //移除棋子
 
 inline void Position::move_piece(Square from, Square to) {
@@ -332,8 +343,11 @@ inline void Position::move_piece(Square from, Square to) {
     //todo
     // if (type_of(pc) == KING)
     //     kingSquare[color_of(pc)] = to;
+    //todo
+#if ENABLE_NNUE
     midEncoding[color_of(pc)] -= Eval::NNUE::Features::HalfKAv2_hm::MidMirrorEncoding[pc][from];
     midEncoding[color_of(pc)] += Eval::NNUE::Features::HalfKAv2_hm::MidMirrorEncoding[pc][to];
+#endif
 } //移动棋子
 
 inline void Position::do_move(Move m, StateInfo& newSt, const TranspositionTable* tt = nullptr) {

@@ -403,7 +403,11 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
 
     for (Color c : {WHITE, BLACK})
     {
+        #if NNUE_COMPAT == 0
         for (PieceType pt = ROOK; pt <= KING; ++pt)
+        #else
+        for (PieceType pt = ELEPHANT; pt <= RAT; ++pt)
+        #endif
         {
             const Piece    piece    = make_piece(c, pt);
             const Bitboard oldBB    = entry.byColorBB[c] & entry.byTypeBB[pt];
@@ -549,7 +553,11 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     for (Color c : {WHITE, BLACK})
         entry.byColorBB[c] = pos.pieces(c);
 
+    #if NNUE_COMPAT == 0
     for (PieceType pt = ROOK; pt <= KING; ++pt)
+    #else
+    for (PieceType pt = ELEPHANT; pt <= RAT; ++pt)
+    #endif
         entry.byTypeBB[pt] = pos.pieces(pt);
 }
 

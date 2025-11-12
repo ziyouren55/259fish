@@ -39,7 +39,7 @@
 namespace Stockfish::Eval::NNUE {
 
 
-constexpr std::string_view PieceToChar(" RACPNBK racpnbk");
+constexpr std::string_view PieceToChar("ELTPWDCR eltpwdcr");
 
 
 namespace {
@@ -108,7 +108,11 @@ trace(Position& pos, const Eval::NNUE::Networks& networks, Eval::NNUE::Accumulat
     // A lambda to output one box of the board
     auto writeSquare = [&board, &pos](File file, Rank rank, Piece pc, Value value) {
         const int x = int(file) * 8;
+        #if NNUE_COMPAT == 0
         const int y = (RANK_9 - int(rank)) * 3;
+        #else
+        const int y = (RANK_8 - int(rank)) * 3;
+        #endif
         for (int i = 1; i < 8; ++i)
             board[y][x + i] = board[y + 3][x + i] = '-';
         for (int i = 1; i < 3; ++i)
@@ -128,14 +132,24 @@ trace(Position& pos, const Eval::NNUE::Networks& networks, Eval::NNUE::Accumulat
     Value base              = psqt + positional;
     base                    = pos.side_to_move() == WHITE ? base : -base;
 
+    #if NNUE_COMPAT == 0
     for (File f = FILE_A; f <= FILE_I; ++f)
-        for (Rank r = RANK_0; r <= RANK_9; ++r)
+    for (Rank r = RANK_0; r <= RANK_9; ++r)
+    
+    #else
+    for (File f = FILE_A; f <= FILE_G; ++f)
+    for (Rank r = RANK_0; r <= RANK_8; ++r)
+    #endif
         {
             Square sq = make_square(f, r);
             Piece  pc = pos.piece_on(sq);
             Value  v  = VALUE_NONE;
 
-            if (pc != NO_PIECE && type_of(pc) != KING)
+            if (pc != NO_PIECE 
+                #if NNUE_COMPAT == 0
+                && type_of(pc) != KING
+                #endif
+                )
             {
                 pos.remove_piece(sq);
 

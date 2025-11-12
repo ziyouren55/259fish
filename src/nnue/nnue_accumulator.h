@@ -64,6 +64,21 @@ struct alignas(CacheLineSize) Accumulator {
 
 struct AccumulatorCaches {
 
+#if NNUE_COMPAT
+    // clang-format off
+    static constexpr uint8_t KingCacheMaps[SQUARE_NB] = {
+        0,  0,  0,  1,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  0,  0,  0,  0,
+        0,  0,  0,  1,  0,  0,  0,
+        };
+        // clang-format on
+#else
     // clang-format off
     static constexpr uint8_t KingCacheMaps[SQUARE_NB] = {
       0,  0,  0,  6,  0,  3,  0,  0,  0,
@@ -78,7 +93,7 @@ struct AccumulatorCaches {
       0,  0,  0,  6,  0,  3,  0,  0,  0,
     };
     // clang-format on
-
+#endif
     //构造函数，用于初始化累加器缓存
     template<typename Networks>
     AccumulatorCaches(const Networks& networks) {

@@ -120,6 +120,14 @@ constexpr bool Is64Bit = true;
 constexpr bool Is64Bit = false;
     #endif
 
+#ifndef ENABLE_NNUE
+#define ENABLE_NNUE 0
+#endif
+
+#ifndef CHANGE_FOR_COMPAT
+#define CHANGE_FOR_COMPAT 1 //仅仅表示为兼容而修改，并非实意
+#endif
+
 using Key      = uint64_t;
 using Bitboard = uint64_t;
 

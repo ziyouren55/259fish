@@ -34,8 +34,10 @@
 #include "misc.h"
 #include "movegen.h"
 #include "movepick.h"
-#include "nnue/network.h"
-#include "nnue/nnue_accumulator.h"
+#if ENABLE_NNUE
+    #include "nnue/network.h"
+    #include "nnue/nnue_accumulator.h"
+#endif
 #include "position.h"
 #include "thread.h"
 #include "timeman.h"
@@ -131,22 +133,28 @@ Search::Worker::Worker(SharedState&                    sharedState,
     manager(std::move(sm)),
     options(sharedState.options),
     threads(sharedState.threads),
-    tt(sharedState.tt),
+    tt(sharedState.tt)
+#if ENABLE_NNUE
+    ,
     networks(sharedState.networks),
-    refreshTable(networks[token]) {
+    refreshTable(networks[token])
+#endif
+{
     clear();
 }
 
 void Search::Worker::ensure_network_replicated() {
+#if ENABLE_NNUE
     // Access once to force lazy initialization.
-    // We do this because we want to avoid initialization during search.
     (void) (networks[numaAccessToken]);
+#endif
 }
 
 void Search::Worker::start_searching() {
 
+#if ENABLE_NNUE
     accumulatorStack.reset();
-
+#endif
     // Non-main threads go directly to iterative_deepening()
     if (!is_mainthread())
     {
@@ -477,14 +485,18 @@ void Search::Worker::do_move(Position& pos, const Move move, StateInfo& st) {
 void Search::Worker::do_move(Position& pos, const Move move, StateInfo& st, const bool givesCheck) {
     DirtyPiece dp = pos.do_move(move, st, givesCheck, &tt);
     nodes.fetch_add(1, std::memory_order_relaxed);
+#if ENABLE_NNUE
     accumulatorStack.push(dp);
+#endif
 }
 
 void Search::Worker::do_null_move(Position& pos, StateInfo& st) { pos.do_null_move(st, tt); }
 
 void Search::Worker::undo_move(Position& pos, const Move move) {
     pos.undo_move(move);
+#if ENABLE_NNUE
     accumulatorStack.pop();
+#endif
 }
 
 void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
@@ -514,7 +526,9 @@ void Search::Worker::clear() {
     for (size_t i = 1; i < reductions.size(); ++i)
         reductions[i] = int(1531 / 100.0 * std::log(i));
 
+#if ENABLE_NNUE
     refreshTable.clear(networks[numaAccessToken]);
+#endif
 }
 
 
@@ -718,10 +732,14 @@ Value Search::Worker::search(
     if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCapture && !ttHit)
     {
         int bonus = std::clamp(-18 * int((ss - 1)->staticEval + ss->staticEval), -1056, 2024) + 341;
+        //todo
+        // thisThread->mainHistory[~us][((ss - 1)->currentMove).from_to()] << bonus * 1284 / 1024;
+        // if (type_of(pos.piece_on(prevSq)) != PAWN)
+        //     thisThread->pawnHistory[pawn_structure_index(pos)][pos.piece_on(prevSq)][prevSq]
+        //       << bonus * 1254 / 1024;
         thisThread->mainHistory[~us][((ss - 1)->currentMove).from_to()] << bonus * 1284 / 1024;
-        if (type_of(pos.piece_on(prevSq)) != PAWN)
-            thisThread->pawnHistory[pawn_structure_index(pos)][pos.piece_on(prevSq)][prevSq]
-              << bonus * 1254 / 1024;
+        thisThread->pawnHistory[pawn_structure_index(pos)][pos.piece_on(prevSq)][prevSq]
+          << bonus * 1254 / 1024;
     }
 
     // Set up the improving flag, which is true if current static evaluation is
@@ -1343,7 +1361,11 @@ moves_loop:  // When in check, search starts here
         thisThread->mainHistory[~us][((ss - 1)->currentMove).from_to()]
           << scaledBonus * 213 / 32768;
 
+        #if CHANGE_FOR_COMPAT == 0
         if (type_of(pos.piece_on(prevSq)) != PAWN)
+        #else
+        if (type_of(pos.piece_on(prevSq)) != RAT)
+        #endif
             thisThread->pawnHistory[pawn_structure_index(pos)][pos.piece_on(prevSq)][prevSq]
               << scaledBonus * 992 / 32768;
     }
@@ -1669,10 +1691,16 @@ TimePoint Search::Worker::elapsed() const {
 
 TimePoint Search::Worker::elapsed_time() const { return main_manager()->tm.elapsed_time(); }
 
+#if ENABLE_NNUE
 Value Search::Worker::evaluate(const Position& pos) {
     return Eval::evaluate(networks[numaAccessToken], pos, accumulatorStack, refreshTable,
                           optimism[pos.side_to_move()]);
 }
+#else
+Value Search::Worker::evaluate(const Position& pos) {
+    return VALUE_ZERO;  // 可替换为 pos.major_material()
+}
+#endif
 
 namespace {
 // Adjusts a mate from "plies to mate from the root" to

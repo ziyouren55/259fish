@@ -31,8 +31,10 @@
 
 #include "evaluate.h"
 #include "misc.h"
+#if ENABLE_NNUE
 #include "nnue/network.h"
 #include "nnue/nnue_common.h"
+#endif
 #include "numa.h"
 #include "perft.h"
 #include "position.h"
@@ -53,8 +55,11 @@ Engine::Engine(std::optional<std::string> path) :
     binaryDirectory(path ? CommandLine::get_binary_directory(*path) : ""),
     numaContext(NumaConfig::from_system()),
     states(new std::deque<StateInfo>(1)),
-    threads(),
-    networks(numaContext, NN::Networks(NN::NetworkBig({EvalFileDefaultNameBig, "None", ""}))) {
+    threads()
+#if ENABLE_NNUE
+  , networks(numaContext, NN::Networks(NN::NetworkBig({EvalFileDefaultNameBig, "None", ""})))
+#endif
+{
     pos.set(StartFEN, &states->back());
 
 
@@ -101,13 +106,17 @@ Engine::Engine(std::optional<std::string> path) :
 
     options.add("UCI_ShowWDL", Option(false));
 
+#if ENABLE_NNUE
     options.add(  //
-      "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {
-          load_big_network(o);
-          return std::nullopt;
-      }));
+    "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {
+        load_big_network(o);
+        return std::nullopt;
+    }));
+#endif
 
+#if ENABLE_NNUE
     load_networks();
+#endif
     resize_threads();
 }
 
@@ -194,16 +203,26 @@ void Engine::set_numa_config_from_option(const std::string& o) {
 
     // Force reallocation of threads in case affinities need to change.
     resize_threads();
+    #if ENABLE_NNUE
     threads.ensure_network_replicated();
+    #endif
 }
 
 void Engine::resize_threads() {
     threads.wait_for_search_finished();
-    threads.set(numaContext.get_numa_config(), {options, threads, tt, networks}, updateContext);
+    threads.set(numaContext.get_numa_config(),
+#if ENABLE_NNUE
+            {options, threads, tt, networks},
+#else
+            {options, threads, tt},
+#endif
+            updateContext);
 
-    // Reallocate the hash with the new threadpool size
-    set_tt_size(options["Hash"]);
+// Reallocate the hash with the new threadpool size
+set_tt_size(options["Hash"]);
+#if ENABLE_NNUE
     threads.ensure_network_replicated();
+#endif
 }
 
 void Engine::set_tt_size(size_t mb) {
@@ -215,10 +234,15 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 
 // network related
 
+#if ENABLE_NNUE
 void Engine::verify_networks() const {
     networks->big.verify(options["EvalFile"], onVerifyNetworks);
 }
+#else
+void Engine::verify_networks() const {}
+#endif
 
+#if ENABLE_NNUE
 void Engine::load_networks() {
     networks.modify_and_replicate([this](NN::Networks& networks_) {
         networks_.big.load(binaryDirectory, options["EvalFile"]);
@@ -226,21 +250,27 @@ void Engine::load_networks() {
     threads.clear();
     threads.ensure_network_replicated();
 }
+#else
+void Engine::load_networks() {}
+#endif
 
+#if ENABLE_NNUE
 void Engine::load_big_network(const std::string& file) {
     networks.modify_and_replicate(
       [this, &file](NN::Networks& networks_) { networks_.big.load(binaryDirectory, file); });
     threads.clear();
     threads.ensure_network_replicated();
 }
-
 void Engine::save_network(const std::pair<std::optional<std::string>, std::string> files) {
     networks.modify_and_replicate(
       [&files](NN::Networks& networks_) { networks_.big.save(files.first); });
 }
+#else
+void Engine::load_big_network(const std::string&) {}
+void Engine::save_network(const std::pair<std::optional<std::string>, std::string>) {}
+#endif
 
-// utility functions
-
+#if ENABLE_NNUE
 void Engine::trace_eval() const {
     StateListPtr trace_states(new std::deque<StateInfo>(1));
     Position     p;
@@ -250,6 +280,13 @@ void Engine::trace_eval() const {
 
     sync_cout << "\n" << Eval::trace(p, *networks) << sync_endl;
 }
+#else
+void Engine::trace_eval() const {
+    sync_cout << "\nNNUE disabled\n" << sync_endl;
+}
+#endif
+
+// utility functions
 
 const OptionsMap& Engine::get_options() const { return options; }
 OptionsMap&       Engine::get_options() { return options; }

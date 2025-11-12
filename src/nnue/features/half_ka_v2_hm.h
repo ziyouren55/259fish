@@ -91,6 +91,7 @@ class HalfKAv2_hm {
     static constexpr auto KingBuckets = []() {
 #define M(s) ((1 << 3) | s) //合成为一个4位bit 低3位为国王位置 最高位为1则为镜像
         // 存储为 (mirror << 3 | bucket)
+        #if NNUE_COMPAT == 0
         constexpr uint8_t KingBuckets[SQUARE_NB] = {
           // clang-format off
           0,  0,  0,  0,  1, M(0),  0,  0,  0, //M(0) = (1 << 3) | 0 =  1000 = 8
@@ -105,10 +106,29 @@ class HalfKAv2_hm {
           0,  0,  0,  0,  1, M(0),  0,  0,  0,
           // clang-format on
         };//存的是国王合理位置的棋盘，m指mirror翻转
+        #else
+        constexpr uint8_t KingBuckets[SQUARE_NB] = {
+          // clang-format off
+          0,  0,  0,  1,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  1,  0,  0,  0,
+        };
+        #endif
 #undef M
         std::array<std::array<std::array<std::pair<int, bool>, 2>, SQUARE_NB>, SQUARE_NB> v{};
+        #if NNUE_COMPAT == 0
         for (uint8_t ksq = SQ_A0; ksq <= SQ_I9; ++ksq)// ksq指国王位置
             for (uint8_t oksq = SQ_A0; oksq <= SQ_I9; ++oksq)// oksq指对方国王位置
+        #else
+        for (uint8_t ksq = SQ_A0; ksq <= SQ_G8; ++ksq)// ksq指国王位置
+            for (uint8_t oksq = SQ_A0; oksq <= SQ_G8; ++oksq)// oksq指对方国王位置
+        #endif
                 for (uint8_t midm = 0; midm <= 1; ++midm)// midm指是否水平翻转
                 {
                     uint8_t king_bucket_ = KingBuckets[ksq];
@@ -151,6 +171,7 @@ class HalfKAv2_hm {
     // Square index mapping based on condition (Mirror, Rotate, ABMap) 根据条件（镜像、旋转、ABMap）获取方格索引映射
     static constexpr auto IndexMap = []() {
         // Map advisor and bishop location into White King plane 将仕和相的位置映射到白王平面
+        #if NNUE_COMPAT == 0
         constexpr uint8_t ABMap[SQUARE_NB] = {
           // clang-format off
            0,  0,  0,  1,  0,  2,  5,  0,  0,//0-8
@@ -165,6 +186,20 @@ class HalfKAv2_hm {
            0,  0, 26, 28,  0, 30, 32,  0,  0,//73-80
           // clang-format on
         }; //为什么不是连续的？缺少了3,4...12，13 21 22
+        #else
+        constexpr uint8_t ABMap[SQUARE_NB] = {
+          // clang-format off
+          0,  0,  0,  1,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  0,  0,  0,  0,
+          0,  0,  0,  1,  0,  0,  0,
+        };
+        #endif
         std::array<std::array<std::array<std::array<std::uint8_t, SQUARE_NB>, 2>, 2>, 2> v{};
         for (uint8_t m = 0; m < 2; ++m) // 是否水平翻转
             for (uint8_t r = 0; r < 2; ++r) // 是否垂直翻转
@@ -313,25 +348,47 @@ class HalfKAv2_hm {
         std::array<std::array<uint64_t, static_cast<size_t>(SQUARE_NB)>,
                    static_cast<size_t>(PIECE_NB)>
                           encodings{};
+        #if NNUE_COMPAT == 0
         constexpr uint8_t shifts[8][2]{{0, 0},   {44, 0},  {60, 36}, {47, 7},
                                        {53, 21}, {50, 14}, {57, 29}, {0, 0}}; // 8种棋子，2个参数，分别是s1数量偏移，s2格子偏移
+        #else
+        constexpr uint8_t shifts[9][2]{{0, 0},   {44, 0},  {60, 36}, {47, 7},
+                                       {53, 21}, {50, 14}, {57, 29}, {0, 0},{0,0}}; // 8种棋子，2个参数，分别是s1数量偏移，s2格子偏移
+        #endif
         for (const auto& c : {WHITE, BLACK})
+        #if NNUE_COMPAT == 0
             for (uint8_t pt = ROOK; pt <= KING; ++pt)
+        #else
+            for (uint8_t pt = ELEPHANT; pt <= RAT; ++pt)
+        #endif
                 for (uint8_t r = RANK_0; r < RANK_NB; ++r)
                     for (uint8_t f = FILE_A; f < FILE_NB; ++f)
                     {
                         uint64_t encoding = 0;
-                        if (f != FILE_E && pt != KING)
+                        if (f != FILE_E 
+                            #if NNUE_COMPAT == 0
+                            && pt != KING
+                            #endif
+                            )
                         {
+                            #if NNUE_COMPAT == 0
                             uint8_t r_           = c == WHITE ? r : RANK_9 - r;
                             uint8_t f_           = f < FILE_E ? f : FILE_I - f;
+                            #else
+                            uint8_t r_           = c == WHITE ? r : RANK_8 - r;
+                            uint8_t f_           = f < FILE_E ? f : FILE_G - f;
+                            #endif
                             const auto& [s1, s2] = shifts[pt];
                             encoding             = (1ULL << s1)
                                      | ((uint64_t(File::FILE_D - f_) * 10 + uint64_t(r_)) << s2);//0-39的编码方式
-                            encoding = f < FILE_E ? encoding : uint64_t(-int64_t(encoding));
+                            encoding = f < FILE_E ? encoding : uint64_t(-int64_t(encoding));//0-39的编码方式
                         }
-                        else if (f != FILE_E && pt == KING)
-                            encoding = 1ULL << 63;
+                        else if (f != FILE_E 
+                            #if NNUE_COMPAT == 0
+                            && pt == KING
+                            #endif
+                            )
+                            encoding = 1ULL << 63;//0-39的编码方式
                         uint8_t p        = static_cast<uint8_t>(make_piece(c, PieceType(pt)));
                         uint8_t sq       = static_cast<uint8_t>(make_square(File(f), Rank(r)));
                         encodings[p][sq] = encoding;
