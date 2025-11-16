@@ -45,6 +45,8 @@
 #include "uci.h"
 #include "ucioption.h"
 
+#include "debug_utils.h"
+
 namespace Stockfish {
 
 using namespace Search;
@@ -244,6 +246,10 @@ void Search::Worker::iterative_deepening() {
     // (ss + 2) is needed for initialization of cutOffCnt.
     Stack  stack[MAX_PLY + 10] = {};
     Stack* ss                  = stack + 7;
+
+    #if DEBUG_NUMS > 90
+        PositionDebugSnapshot snapshot = DebugUtils::create_snapshot(rootPos);
+    #endif
 
     for (int i = 7; i > 0; --i)
     {
@@ -908,6 +914,10 @@ moves_loop:  // When in check, search starts here
     // or a beta cutoff occurs.
     while ((move = mp.next_move()) != Move::none())
     {
+    #if DEBUG_NUMS > 10
+        PositionDebugSnapshot snapshot = DebugUtils::create_snapshot(pos);
+        MoveDebugInfo moveInfo = DebugUtils::create_move_info(move);
+    #endif
         assert(move.is_ok());
 
         if (move == excludedMove)

@@ -40,6 +40,7 @@
     #include <cstddef>
     #include <cstdint>
     #include <type_traits>
+    #include <string_view>
 
     #if defined(_MSC_VER)
         // Disable some silly and noisy warnings from MSVC compiler
@@ -120,13 +121,17 @@ constexpr bool Is64Bit = true;
 constexpr bool Is64Bit = false;
     #endif
 
-#ifndef ENABLE_NNUE
-#define ENABLE_NNUE 0
-#endif
+    #ifndef ENABLE_NNUE
+        #define ENABLE_NNUE 0
+    #endif
 
-#ifndef CHANGE_FOR_COMPAT
-#define CHANGE_FOR_COMPAT 1 //仅仅表示为兼容而修改，并非实意
-#endif
+    #ifndef CHANGE_FOR_COMPAT
+        #define CHANGE_FOR_COMPAT 1  //仅仅表示为兼容而修改，并非实意
+    #endif
+
+    #ifndef DEBUG_NUMS
+        #define DEBUG_NUMS 100
+    #endif
 
 using Key      = uint64_t;
 using Bitboard = uint64_t;
@@ -183,7 +188,7 @@ constexpr Value PantherValue  = 400;   // 豹 - 第四高
 constexpr Value WolfValue     = 300;   // 狼 - 第五高
 constexpr Value DogValue      = 200;   // 狗 - 第六高
 constexpr Value CatValue      = 100;   // 猫 - 第七高
-constexpr Value RatValue    = 50;    // 鼠 - 最低价值
+constexpr Value RatValue      = 50;    // 鼠 - 最低价值
 
 // clang-format off
 //todo :少了to结构
@@ -210,18 +215,19 @@ constexpr Value PieceValue[PIECE_NB] = {
    ElephantValue, LionValue, TigerValue, PantherValue, WolfValue, DogValue, CatValue, RatValue};
 // clang-format on
 
+constexpr std::string_view PieceToChar(" ELTPWDCR        eltpwdcr");
+
 //add:添加棋子rank信息
 static constexpr int JungleRankPT[PIECE_TYPE_NB] = {
-    /* NO_PIECE_TYPE */ 0,
-    /* ELEPHANT      */ 8,
-    /* LION          */ 7,
-    /* TIGER         */ 6,
-    /* PANTHER       */ 5,
-    /* WOLF          */ 4,
-    /* DOG           */ 3,
-    /* CAT           */ 2,
-    /* RAT           */ 1
-};
+  /* NO_PIECE_TYPE */ 0,
+  /* ELEPHANT      */ 8,
+  /* LION          */ 7,
+  /* TIGER         */ 6,
+  /* PANTHER       */ 5,
+  /* WOLF          */ 4,
+  /* DOG           */ 3,
+  /* CAT           */ 2,
+  /* RAT           */ 1};
 
 using Depth = int;
 
@@ -327,6 +333,7 @@ ENABLE_INCR_OPERATORS_ON(PieceType)
 ENABLE_INCR_OPERATORS_ON(Square)
 ENABLE_INCR_OPERATORS_ON(File)
 ENABLE_INCR_OPERATORS_ON(Rank)
+ENABLE_INCR_OPERATORS_ON(Color)
 
     #undef ENABLE_INCR_OPERATORS_ON
 
@@ -416,7 +423,7 @@ class Move {
 
     constexpr bool is_ok() const { return none().data != data && null().data != data; }
 
-    static constexpr Move null() { return Move(129); }
+    static constexpr Move null() { return Move(65); }
     static constexpr Move none() { return Move(0); }
 
     constexpr bool operator==(const Move& m) const { return data == m.data; }

@@ -24,6 +24,7 @@
 #include "bitboard.h"
 #include "misc.h"
 #include "position.h"
+#include "debug_utils.h"
 
 namespace Stockfish {
 
@@ -154,6 +155,9 @@ void MovePicker::score() {
         //                           ? pos.check_squares(pt) & ~line_bb(from, pos.king_square(~us))
         //                           : pos.check_squares(pt))
         //                        & to);
+        #if DEBUG_NUMS > 10
+        PositionDebugSnapshot snapshot = DebugUtils::create_snapshot(pos);
+        #endif
         if constexpr (Type == CAPTURES)
         m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
                 + 7 * int(PieceValue[capturedPiece])

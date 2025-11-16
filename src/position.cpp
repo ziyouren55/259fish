@@ -35,6 +35,8 @@
 #include "tt.h"
 #include "uci.h"
 
+#include "debug_utils.h"
+
 using std::string;
 
 namespace Stockfish {
@@ -46,8 +48,6 @@ Key side, noPawns;
 } //保存所有哈希随机数，包括各格子-各棋子的 psq、行棋方 side、以及“无兵”位 noPawns。
 
 namespace {
-
-    constexpr std::string_view PieceToChar(" ELTPWDCR eltpwdcr");
 
     static constexpr Piece Pieces[] = {W_ELEPHANT, W_LION, W_TIGER,    W_PANTHER, W_WOLF,  W_DOG,
                                        W_CAT,      W_RAT,  B_ELEPHANT, B_LION,    B_TIGER, B_PANTHER,
@@ -169,6 +169,11 @@ Position& Position::set(const string& fenStr, StateInfo* si) {
             ++sq;
         }
     }
+
+#if CHANGE_FOR_COMPAT
+    kingSquare[WHITE] = make_square(FILE_D, RANK_8);
+    kingSquare[BLACK] = make_square(FILE_D, RANK_0);
+#endif
 
     // 2. Active color
 
@@ -435,7 +440,10 @@ Bitboard Position::checkers_to(Color c, Square s, Bitboard occupied) const {
 // Tests whether a pseudo-legal move is legal
 // 测试伪合法移动是否合法
 bool Position::legal(Move m) const {
-
+    #if DEBUG_NUMS > 10
+    PositionDebugSnapshot snapshot = DebugUtils::create_snapshot(*this);
+    MoveDebugInfo moveInfo = DebugUtils::create_move_info(m);
+    #endif
     assert(m.is_ok());
 
     Color    us       = sideToMove;

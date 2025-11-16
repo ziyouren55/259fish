@@ -15,5 +15,6 @@ src/-lstdc++.res
 # Neural network for the NNUE evaluation
 **/*.nnue
 
-.idea
+/.idea
 
+/cmake-build-debug

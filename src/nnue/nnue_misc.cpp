@@ -39,9 +39,6 @@
 namespace Stockfish::Eval::NNUE {
 
 
-constexpr std::string_view PieceToChar("ELTPWDCR eltpwdcr");
-
-
 namespace {
 // Converts a Value into (centi)pawns and writes it in a buffer.
 // The buffer must have capacity for at least 5 chars.
