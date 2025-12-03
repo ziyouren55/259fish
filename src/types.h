@@ -133,6 +133,9 @@ constexpr bool Is64Bit = false;
         #define DEBUG_NUMS 100
     #endif
 
+    #define RANK_ONE_BASED
+
+    
 using Key      = uint64_t;
 using Bitboard = uint64_t;
 

@@ -567,7 +567,14 @@ std::string UCIEngine::wdl(Value v, const Position& pos) {
 }
 
 std::string UCIEngine::square(Square s) {
-    return std::string{char('a' + file_of(s)), char('0' + rank_of(s))};
+    Rank r = rank_of(s);
+    
+    // 如果定义了 RANK_ONE_BASED 宏，将行号从0-based转为1-based（前端GUI需要）
+#ifdef RANK_ONE_BASED
+    r = Rank(r + 1);
+#endif
+    
+    return std::string{char('a' + file_of(s)), char('0' + r)};
 }
 
 std::string UCIEngine::move(Move m) {
